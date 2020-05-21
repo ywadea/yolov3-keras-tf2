@@ -669,3 +669,58 @@ class MidTrainingEvaluator(Callback, Trainer):
             file_name = os.path.basename(file_path)
             new_path = os.path.join(evaluation_dir, file_name)
             shutil.move(file_path, new_path)
+
+
+if __name__ == '__main__':
+    anc = np.array(
+        [[43, 70],
+         [82, 66],
+         [70, 70],
+         [103, 66],
+         [107, 66],
+         [110, 84],
+         [207, 176],
+         [178, 414],
+         [450, 243]]
+    )
+    dt = {'relative_labels': '../Data/bh_labels.csv',
+          'augmentation': True,
+          'sequences': preset_1,
+          'dataset_name': 'beverly_hills',
+          'test_size': 0.2}
+    tr = Trainer((416, 416, 3),
+                 '../Config/beverly_hills.txt',
+                 train_tf_record='../Data/TFRecords/beverly_hills_train.tfrecord',
+                 valid_tf_record='../Data/TFRecords/beverly_hills_test.tfrecord',
+                 image_width=1344,
+                 image_height=756,
+                 anchors=anc,
+                 score_threshold=0.1)
+    ovs = {
+        'Car': 0.55,
+        'Street Sign': 0.5,
+        'Palm Tree': 0.5,
+        'Street Lamp': 0.5,
+        'Minivan': 0.5,
+        'Traffic Lights': 0.5,
+        'Pedestrian': 0.5,
+        'Fire Hydrant': 0.5,
+        'Flag': 0.5,
+        'Trash Can': 0.5,
+        'Bicycle': 0.5,
+        'Bus': 0.5,
+        'Pickup Truck': 0.5,
+        'Road Block': 0.5,
+        'Delivery Truck': 0.5,
+        'Motorcycle': 0.5,
+    }
+    tr.train(100,
+             16,
+             1e-5,
+             # new_dataset_conf=dt,
+             merge_evaluation=False,
+             evaluation_workers=16,
+             min_overlaps=ovs,
+             n_epoch_eval=1,
+             clear_outputs=True,
+             weights='../Models/trained_model.tf')

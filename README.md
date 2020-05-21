@@ -247,6 +247,8 @@ can be evaluated separately and calculate mAP(mean average precision) as well
 as precision and recall curves for every class in the model, 
 check [Evaluator.md](Docs/Evaluator.md)
 
+![GitHub Logo](/Samples/eval.png)
+
 ### **labelpix support**
 
 You can check my other repo [labelpix](https://github.com/emadboctorx/labelpix) which is a
