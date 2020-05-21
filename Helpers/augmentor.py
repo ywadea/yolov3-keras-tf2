@@ -9,7 +9,6 @@ import imgaug as ia
 from pathlib import Path
 from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Config.augmentation_options import augmentations
 from Helpers.utils import ratios_to_coordinates, timer, default_logger
 from Helpers.annotation_parsers import adjust_non_voc_csv
 

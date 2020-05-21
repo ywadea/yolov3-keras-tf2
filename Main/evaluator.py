@@ -537,3 +537,4 @@ class Evaluator(V3Model):
             visualize_pr(calculated, save_figs, fig_prefix)
             visualize_evaluation_stats(stats, fig_prefix)
         return stats, map_score
+

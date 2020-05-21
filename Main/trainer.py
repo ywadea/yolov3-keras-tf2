@@ -352,18 +352,20 @@ class Trainer(V3Model):
         Returns:
             None
         """
-        for file_name in os.listdir(os.path.join('..', 'Output')):
-            if not file_name.startswith('.'):
+        for folder_name in os.listdir(os.path.join('..', 'Output')):
+            if not folder_name.startswith('.'):
                 full_path = (
-                    Path(os.path.join('..', 'Output', file_name))
+                    Path(os.path.join('..', 'Output', folder_name))
                     .absolute()
                     .resolve()
                 )
-                if os.path.isdir(full_path):
-                    shutil.rmtree(full_path)
-                else:
-                    os.remove(full_path)
-                default_logger.info(f'Deleted old output: {full_path}')
+                for file_name in os.listdir(full_path):
+                    full_file_path = Path(os.path.join(full_path, file_name))
+                    if os.path.isdir(full_file_path):
+                        shutil.rmtree(full_file_path)
+                    else:
+                        os.remove(full_file_path)
+                    default_logger.info(f'Deleted old output: {full_file_path}')
 
     def create_new_dataset(self, new_dataset_conf):
         """
@@ -653,33 +655,17 @@ class MidTrainingEvaluator(Callback, Trainer):
         if not (epoch + 1) % self.n_epochs == 0:
             return
         self.evaluate(*self.evaluation_args)
-        os.mkdir(
-            os.path.join(
-                '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation'
-            )
-        )
-        for file_name in os.listdir(
-            os.path.join('..', 'Output', 'Evaluation')
-        ):
-            if not os.path.isdir(file_name) and (
-                file_name.endswith('.png') or 'prediction' in file_name
-            ):
-                full_path = str(
-                    Path(os.path.join('..', 'Output', 'Evaluation', file_name))
-                    .absolute()
-                    .resolve()
-                )
-                new_path = str(
-                    Path(
-                        os.path.join(
-                            '..',
-                            'Output',
-                            'Evaluation',
-                            f'epoch-{epoch}-evaluation',
-                            file_name,
-                        )
-                    )
-                    .absolute()
-                    .resolve()
-                )
-                shutil.move(full_path, new_path)
+        evaluation_dir = str(Path(os.path.join(
+                '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation')).absolute().resolve())
+        os.mkdir(evaluation_dir)
+        current_predictions = [str(Path(os.path.join(
+            '..', 'Output', 'Data', item)).absolute().resolve())
+                               for item in os.listdir(os.path.join('..', 'Output', 'Data'))]
+        current_figures = [str(Path(os.path.join(
+            '..', 'Output', 'Plots', item)).absolute().resolve())
+                           for item in os.path.join('..', 'Output', 'Plots')]
+        current_files = current_predictions + current_figures
+        for file_path in current_files:
+            file_name = os.path.basename(file_path)
+            new_path = os.path.join(evaluation_dir, file_name)
+            shutil.move(file_path, new_path)
