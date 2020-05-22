@@ -655,6 +655,8 @@ class MidTrainingEvaluator(Callback, Trainer):
         if not (epoch + 1) % self.n_epochs == 0:
             return
         self.evaluate(*self.evaluation_args)
+        import pdb
+        pdb.set_trace()
         evaluation_dir = str(Path(os.path.join(
                 '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation')).absolute().resolve())
         os.mkdir(evaluation_dir)
@@ -663,9 +665,10 @@ class MidTrainingEvaluator(Callback, Trainer):
                                for item in os.listdir(os.path.join('..', 'Output', 'Data'))]
         current_figures = [str(Path(os.path.join(
             '..', 'Output', 'Plots', item)).absolute().resolve())
-                           for item in os.path.join('..', 'Output', 'Plots')]
+                           for item in os.listdir(os.path.join('..', 'Output', 'Plots'))]
         current_files = current_predictions + current_figures
         for file_path in current_files:
-            file_name = os.path.basename(file_path)
-            new_path = os.path.join(evaluation_dir, file_name)
-            shutil.move(file_path, new_path)
+            if os.path.isfile(file_path):
+                file_name = os.path.basename(file_path)
+                new_path = os.path.join(evaluation_dir, file_name)
+                shutil.move(file_path, new_path)
