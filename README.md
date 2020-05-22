@@ -16,6 +16,15 @@
     ·
     <a href="https://github.com/emadboctorx/yolov3-keras-tf2/issues">Request Feature</a>
   </p>
+  
+<!-- TODO -->
+## **TODO**
+
+* [ ] Transfer learning
+* [ ] YoloV4 configuration
+* [ ] Live plot losses
+* [ ] Command line handler
+
 
 <!-- TABLE OF CONTENTS -->
 ## **Table of Contents**
