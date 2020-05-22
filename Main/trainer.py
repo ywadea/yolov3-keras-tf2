@@ -655,8 +655,6 @@ class MidTrainingEvaluator(Callback, Trainer):
         if not (epoch + 1) % self.n_epochs == 0:
             return
         self.evaluate(*self.evaluation_args)
-        import pdb
-        pdb.set_trace()
         evaluation_dir = str(Path(os.path.join(
                 '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation')).absolute().resolve())
         os.mkdir(evaluation_dir)
