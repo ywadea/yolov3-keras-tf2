@@ -423,7 +423,7 @@ class Trainer(V3Model):
             callbacks.
         """
         return [
-            ReduceLROnPlateau(verbose=3),
+            ReduceLROnPlateau(verbose=1, patience=4),
             ModelCheckpoint(
                 os.path.join(checkpoint_name),
                 verbose=1,

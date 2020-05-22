@@ -24,6 +24,8 @@
 * [ ] YoloV4 configuration
 * [ ] Live plot losses
 * [ ] Command line handler
+* [ ] YoloV3 tiny
+* [ ] Rasberry Pi support
 
 
 <!-- TABLE OF CONTENTS -->
