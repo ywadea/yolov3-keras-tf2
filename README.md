@@ -138,6 +138,7 @@ There are 2 currently supported formats that the program is able to read and tra
 
 * **XML VOC format which looks like the following example:**
 
+
 ```xml
 <annotation>
 	<folder>/path/to/image/folder</folder>
@@ -156,6 +157,14 @@ There are 2 currently supported formats that the program is able to read and tra
 			<xmax>400.00000051200004</xmax>
 			<ymax>469.000000098</ymax>
 		</bndbox>
+    <object>
+            <name>obj2_name</name>
+            <bndbox>
+                <xmin>252.545254</xmin>
+                <ymin>115.756465</ymin>
+                <xmax>299.75647654</xmax>
+                <ymax>215.23132</ymax>
+            </bndbox>
 </annotation>
 ```
 
