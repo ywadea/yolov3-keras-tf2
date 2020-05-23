@@ -3,7 +3,7 @@ import cv2
 import tensorflow as tf
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.utils import (
     get_detection_data,
     activate_gpu,
@@ -13,7 +13,7 @@ from Helpers.utils import (
 )
 
 
-class Detector(V3Model):
+class Detector(BaseModel):
     """Tool for detection on photos/videos"""
 
     def __init__(
@@ -25,6 +25,7 @@ class Detector(V3Model):
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
     ):
         """
         Initialize detection settings.
@@ -38,6 +39,7 @@ class Detector(V3Model):
                 maximum boxes setting.
             iou_threshold: float, values less than the threshold are ignored.
             score_threshold: float, values less than the threshold are ignored.
+            model_configuration: Path to model configuration file.
         """
         self.class_names = [
             item.strip() for item in open(classes_file).readlines()
@@ -60,6 +62,7 @@ class Detector(V3Model):
             max_boxes=max_boxes,
             iou_threshold=iou_threshold,
             score_threshold=score_threshold,
+            model_configuration=model_configuration
         )
         activate_gpu()
 
@@ -131,8 +134,7 @@ class Detector(V3Model):
 
     @timer(default_logger)
     def predict_photos(
-        self, photos, trained_weights, batch_size=32, workers=16,
-            model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
+        self, photos, trained_weights, batch_size=32, workers=16
     ):
         """
         Predict a list of image paths and save results to output folder.
@@ -141,12 +143,11 @@ class Detector(V3Model):
             trained_weights: .weights or .tf file
             batch_size: Prediction batch size.
             workers: Parallel predictions.
-            model_configuration: Path to file containing model configuration.
 
         Returns:
             None
         """
-        self.create_models(model_configuration)
+        self.create_models()
         self.load_weights(trained_weights)
         to_predict = photos.copy()
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -178,8 +179,7 @@ class Detector(V3Model):
 
     @timer(default_logger)
     def detect_video(
-        self, video, trained_weights, codec='mp4v', display=False,
-            model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
+        self, video, trained_weights, codec='mp4v', display=False
     ):
         """
         Perform detection on a video, stream(optional) and save results.
@@ -189,12 +189,11 @@ class Detector(V3Model):
             codec: str ex: mp4v
             display: If True, detections will be displayed during
                 the detection operation.
-            model_configuration:
 
         Returns:
             None
         """
-        self.create_models(model_configuration)
+        self.create_models()
         self.load_weights(trained_weights)
         vid = cv2.VideoCapture(video)
         length = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))

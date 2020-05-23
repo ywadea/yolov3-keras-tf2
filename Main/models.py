@@ -17,7 +17,7 @@ import os
 from Helpers.utils import get_boxes, timer, default_logger, Mish
 
 
-class V3Model:
+class BaseModel:
     def __init__(
         self,
         input_shape,
@@ -27,9 +27,10 @@ class V3Model:
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
     ):
         """
-        Initialize yolov3 model.
+        Initialize yolo model.
         Args:
             input_shape: tuple(n, n, c)
             classes: Number of classes(defaults to 80 for Coco objects)
@@ -74,6 +75,7 @@ class V3Model:
             Concatenate,
             Lambda,
             Model,
+            Mish
         )
         self.func_names = [
             'zero_padding',
@@ -86,6 +88,7 @@ class V3Model:
             'concat',
             'lambda',
             'model',
+            'mish'
         ]
         self.layer_names = {
             func.__name__: f'layer_CURRENT_LAYER_{name}'
@@ -98,6 +101,7 @@ class V3Model:
         self.max_boxes = max_boxes
         self.iou_threshold = iou_threshold
         self.score_threshold = score_threshold
+        self.model_configuration = model_configuration
 
     def apply_func(self, func, x=None, *args, **kwargs):
         """
@@ -194,7 +198,7 @@ class V3Model:
         """
         Apply non-max suppression and get valid detections.
         Args:
-            outputs: yolov3 model outputs.
+            outputs: yolo model outputs.
 
         Returns:
             boxes, scores, classes, valid_detections
@@ -308,11 +312,9 @@ class V3Model:
             )
 
     @timer(default_logger)
-    def create_models(self, configuration):
+    def create_models(self):
         """
-        Create training and inference yolov3 models.
-        Args:
-            configuration: Yolo layer configuration file.
+        Create training and inference yolo models.
 
         Returns:
             training, inference models
@@ -321,7 +323,7 @@ class V3Model:
         x = input_initial
         skips, output_layers, detection_layers, training_outs, inference_outs, concat = (
             {}, [], [], [], [], [])
-        layers = [item.strip() for item in open(configuration).readlines()]
+        layers = [item.strip() for item in open(self.model_configuration).readlines()]
         layers = list(map(lambda l: l.split(',') if ',' in l else [l], layers))
         for layer in layers:
             result = self.create_layer(
@@ -433,6 +435,6 @@ class V3Model:
 
 
 if __name__ == '__main__':
-    mod = V3Model((416, 416, 3), 80)
+    mod = BaseModel((416, 416, 3), 80)
     tr, inf = mod.create_models('../Config/yolo3_3o.txt')
     mod.load_weights('../../../yolov3.weights')

@@ -7,7 +7,7 @@ import sys
 
 sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.dataset_handlers import read_tfr, get_feature_map
 from Helpers.utils import (
     transform_images,
@@ -18,7 +18,7 @@ from Helpers.utils import (
 from Helpers.visual_tools import visualize_pr, visualize_evaluation_stats
 
 
-class Evaluator(V3Model):
+class Evaluator(BaseModel):
     def __init__(
         self,
         input_shape,
@@ -30,6 +30,7 @@ class Evaluator(V3Model):
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Evaluate a trained model.
@@ -44,6 +45,7 @@ class Evaluator(V3Model):
             iou_threshold: Minimum overlap value.
             score_threshold: Minimum confidence for detection to count
                 as true positive.
+            model_configuration: Path to model configuration file.
         """
         self.classes_file = classes_file
         self.class_names = [
@@ -57,6 +59,7 @@ class Evaluator(V3Model):
             max_boxes,
             iou_threshold,
             score_threshold,
+            model_configuration
         )
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
@@ -155,7 +158,6 @@ class Evaluator(V3Model):
         workers=16,
         shuffle_buffer=512,
         batch_size=64,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Make predictions on both training and validation data sets
@@ -167,14 +169,13 @@ class Evaluator(V3Model):
             workers: Parallel predictions.
             shuffle_buffer: int, shuffle dataset buffer size.
             batch_size: Prediction batch size.
-            model_configuration: Path to file containing model configuration.
 
         Returns:
             1 combined pandas DataFrame for entire dataset predictions
                 or 2 pandas DataFrame(s) for training and validation
                 data sets respectively.
         """
-        self.create_models(model_configuration)
+        self.create_models()
         self.load_weights(trained_weights)
         features = get_feature_map()
         train_dataset = read_tfr(

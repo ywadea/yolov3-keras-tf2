@@ -18,14 +18,14 @@ from Helpers.annotation_parsers import parse_voc_folder
 from Helpers.anchors import k_means, generate_anchors
 from Helpers.augmentor import DataAugment
 from Config.augmentation_options import augmentations
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.utils import transform_images, transform_targets
 from Helpers.annotation_parsers import adjust_non_voc_csv
 from Helpers.utils import calculate_loss, timer, default_logger, activate_gpu
 from Main.evaluator import Evaluator
 
 
-class Trainer(V3Model):
+class Trainer(BaseModel):
     """
     Create a training instance.
     """
@@ -43,6 +43,7 @@ class Trainer(V3Model):
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
     ):
         """
         Initialize training.
@@ -59,6 +60,7 @@ class Trainer(V3Model):
                 maximum boxes setting.
             iou_threshold: float, values less than the threshold are ignored.
             score_threshold: float, values less than the threshold are ignored.
+            model_configuration: Path to model configuration file.
         """
         self.classes_file = classes_file
         self.class_names = [
@@ -72,6 +74,7 @@ class Trainer(V3Model):
             max_boxes,
             iou_threshold,
             score_threshold,
+            model_configuration
         )
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
@@ -451,7 +454,6 @@ class Trainer(V3Model):
         save_figs=True,
         clear_outputs=False,
         n_epoch_eval=None,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
     ):
         """
         Train on the dataset.
@@ -477,7 +479,6 @@ class Trainer(V3Model):
             save_figs: If True and plot_stats=True, figures will be saved
             clear_outputs: If True, old outputs will be cleared
             n_epoch_eval: Conduct evaluation every n epoch.
-            model_configuration: Path to file containing model configuration.
 
         Returns:
             history object, pandas DataFrame with statistics, mAP score.
@@ -490,7 +491,7 @@ class Trainer(V3Model):
         if new_anchors_conf:
             default_logger.info(f'Generating new anchors ...')
             self.generate_new_anchors(new_anchors_conf)
-        self.create_models(model_configuration)
+        self.create_models()
         if weights:
             self.load_weights(weights)
         if new_dataset_conf:
