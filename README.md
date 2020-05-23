@@ -138,23 +138,78 @@ There are 2 currently supported formats that the program is able to read and tra
 
 * **XML VOC format which looks like the following example:**
 
+
 ```xml
 <annotation>
 	<folder>/path/to/image/folder</folder>
 	<filename>image_filename.png</filename>
 	<path>/path/to/image/folder/image_filename.png</path>
 	<size>
-		<width>image_width</width>
-		<height>image_height</height>
-		<depth>image_depth</depth>
+		<width>1344</width>
+		<height>756</height>
+		<depth>3</depth>
 	</size>
 	<object>
-		<name>obj1_name</name>
+		<name>Car</name>
 		<bndbox>
-			<xmin>382.99999987200005</xmin>
-			<ymin>447.000000174</ymin>
-			<xmax>400.00000051200004</xmax>
-			<ymax>469.000000098</ymax>
+			<xmin>873.0000007680001</xmin>
+			<ymin>402.0000001920001</ymin>
+			<xmax>1315.00000128</xmax>
+			<ymax>697.0000000320001</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Car</name>
+		<bndbox>
+			<xmin>550.999999872</xmin>
+			<ymin>404.999999838</ymin>
+			<xmax>883.000000512</xmax>
+			<ymax>711.000000018</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Car</name>
+		<bndbox>
+			<xmin>8.999999903999992</xmin>
+			<ymin>374.999999976</ymin>
+			<xmax>525.99999984</xmax>
+			<ymax>736.000000344</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Traffic Lights</name>
+		<bndbox>
+			<xmin>857.999999808</xmin>
+			<ymin>312.99999960599996</ymin>
+			<xmax>903.9999991679999</xmax>
+			<ymax>372.99999933</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Traffic Lights</name>
+		<bndbox>
+			<xmin>1220.99999952</xmin>
+			<ymin>91.999999854</ymin>
+			<xmax>1317.999999456</xmax>
+			<ymax>249.99999985799997</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Traffic Lights</name>
+		<bndbox>
+			<xmin>701.999999232</xmin>
+			<ymin>207.00000014399998</ymin>
+			<xmax>753.999998976</xmax>
+			<ymax>275.000000184</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Street Sign</name>
+		<bndbox>
+			<xmin>798.99999984</xmin>
+			<ymin>244.999999944</ymin>
+			<xmax>881.00000016</xmax>
+			<ymax>275.000000184</ymax>
 		</bndbox>
 </annotation>
 ```

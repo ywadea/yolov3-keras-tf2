@@ -155,6 +155,7 @@ class Evaluator(V3Model):
         workers=16,
         shuffle_buffer=512,
         batch_size=64,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Make predictions on both training and validation data sets
@@ -166,13 +167,14 @@ class Evaluator(V3Model):
             workers: Parallel predictions.
             shuffle_buffer: int, shuffle dataset buffer size.
             batch_size: Prediction batch size.
+            model_configuration: Path to file containing model configuration.
 
         Returns:
             1 combined pandas DataFrame for entire dataset predictions
                 or 2 pandas DataFrame(s) for training and validation
                 data sets respectively.
         """
-        self.create_models()
+        self.create_models(model_configuration)
         self.load_weights(trained_weights)
         features = get_feature_map()
         train_dataset = read_tfr(

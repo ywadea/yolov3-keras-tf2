@@ -131,7 +131,8 @@ class Detector(V3Model):
 
     @timer(default_logger)
     def predict_photos(
-        self, photos, trained_weights, batch_size=32, workers=16
+        self, photos, trained_weights, batch_size=32, workers=16,
+            model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Predict a list of image paths and save results to output folder.
@@ -140,11 +141,12 @@ class Detector(V3Model):
             trained_weights: .weights or .tf file
             batch_size: Prediction batch size.
             workers: Parallel predictions.
+            model_configuration: Path to file containing model configuration.
 
         Returns:
             None
         """
-        self.create_models()
+        self.create_models(model_configuration)
         self.load_weights(trained_weights)
         to_predict = photos.copy()
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -176,7 +178,8 @@ class Detector(V3Model):
 
     @timer(default_logger)
     def detect_video(
-        self, video, trained_weights, codec='mp4v', display=False
+        self, video, trained_weights, codec='mp4v', display=False,
+            model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Perform detection on a video, stream(optional) and save results.
@@ -186,11 +189,12 @@ class Detector(V3Model):
             codec: str ex: mp4v
             display: If True, detections will be displayed during
                 the detection operation.
+            model_configuration:
 
         Returns:
             None
         """
-        self.create_models()
+        self.create_models(model_configuration)
         self.load_weights(trained_weights)
         vid = cv2.VideoCapture(video)
         length = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))

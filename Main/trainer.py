@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import sys
-
 sys.path.append('..')
 from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
@@ -23,7 +22,6 @@ from Main.models import V3Model
 from Helpers.utils import transform_images, transform_targets
 from Helpers.annotation_parsers import adjust_non_voc_csv
 from Helpers.utils import calculate_loss, timer, default_logger, activate_gpu
-from Config.augmentation_options import preset_1
 from Main.evaluator import Evaluator
 
 
@@ -453,6 +451,7 @@ class Trainer(V3Model):
         save_figs=True,
         clear_outputs=False,
         n_epoch_eval=None,
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
     ):
         """
         Train on the dataset.
@@ -478,6 +477,7 @@ class Trainer(V3Model):
             save_figs: If True and plot_stats=True, figures will be saved
             clear_outputs: If True, old outputs will be cleared
             n_epoch_eval: Conduct evaluation every n epoch.
+            model_configuration: Path to file containing model configuration.
 
         Returns:
             history object, pandas DataFrame with statistics, mAP score.
@@ -490,7 +490,7 @@ class Trainer(V3Model):
         if new_anchors_conf:
             default_logger.info(f'Generating new anchors ...')
             self.generate_new_anchors(new_anchors_conf)
-        self.create_models()
+        self.create_models(model_configuration)
         if weights:
             self.load_weights(weights)
         if new_dataset_conf:

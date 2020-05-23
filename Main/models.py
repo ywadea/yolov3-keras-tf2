@@ -14,7 +14,7 @@ from tensorflow.keras import Model
 import tensorflow as tf
 import numpy as np
 import os
-from Helpers.utils import get_boxes, timer, default_logger
+from Helpers.utils import get_boxes, timer, default_logger, Mish
 
 
 class V3Model:
@@ -319,14 +319,14 @@ class V3Model:
         """
         input_initial = self.apply_func(Input, shape=self.input_shape)
         x = input_initial
-        skips, output_layers, detection_layers, training_outs, inference_outs, concats = (
+        skips, output_layers, detection_layers, training_outs, inference_outs, concat = (
             {}, [], [], [], [], [])
         layers = [item.strip() for item in open(configuration).readlines()]
         layers = list(map(lambda l: l.split(',') if ',' in l else [l], layers))
         for layer in layers:
             result = self.create_layer(
                 layer, x, skips, detection_layers, training_outs,
-                concats, input_initial, inference_outs)
+                concat, input_initial, inference_outs)
             if result is not None:
                 x = result
         default_logger.info('Training and inference models created')
