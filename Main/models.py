@@ -240,132 +240,95 @@ class V3Model:
         )
         return boxes, scores, classes, valid_detections
 
+    def create_layer(self,
+                     layer_configuration,
+                     x,
+                     skips,
+                     detections,
+                     training_outputs,
+                     concats,
+                     input_initial,
+                     inference_outputs):
+        if 'conv' in layer_configuration:
+            if len(layer_configuration) < 6:
+                layer_configuration = (
+                        [int(item) for item in layer_configuration[1: 4]] +
+                        ([bool(layer_configuration[4])]))
+            else:
+                layer_configuration = (
+                        [int(item) for item in layer_configuration[1: 4]] +
+                        ([bool(layer_configuration[4])] + [layer_configuration[5]]))
+            return self.convolution_block(x, *layer_configuration)
+        if 'skip' in layer_configuration[0]:
+            if skips:
+                skips['skip_61'] = x
+            else:
+                skips['skip_36'] = x
+        if 'detection' in layer_configuration[0]:
+            detections.append(x)
+        if 'output' in layer_configuration[0]:
+            out = self.output(detections.pop(), int(layer_configuration[1]))
+            training_outputs.append(out)
+        if 'upsample' in layer_configuration:
+            return self.apply_func(UpSampling2D, x, size=2)
+        if 'concat' in layer_configuration:
+            if concats:
+                result = self.apply_func(Concatenate, [x, skips['skip_36']])
+            else:
+                result = self.apply_func(Concatenate, [x, skips['skip_61']])
+                concats.append(1)
+            return result
+        if 'training_model' in layer_configuration:
+            self.training_model = Model(
+                input_initial,
+                training_outputs,
+                name='training_model',
+            )
+        if 'boxes' in layer_configuration[0]:
+            box_index = int(layer_configuration[0].split('_')[-1])
+            result = self.apply_func(
+                Lambda,
+                training_outputs[box_index],
+                lambda item: get_boxes(
+                    item, self.anchors[self.masks[box_index]], self.classes
+                ),
+            )
+            inference_outputs.append(result)
+        if 'nms' in layer_configuration:
+            inference_outputs = self.apply_func(
+                Lambda,
+                (inference_outputs[0][:3],
+                 inference_outputs[1][:3],
+                 inference_outputs[2][:3]),
+                lambda item: self.get_nms(item),
+            )
+        if 'inference_model' in layer_configuration:
+            self.inference_model = Model(
+                input_initial, inference_outputs, name='inference_model'
+            )
+
     @timer(default_logger)
-    def create_models(self):
+    def create_models(self, configuration):
         """
         Create training and inference yolov3 models.
         Args:
-                layer configuration.
+            configuration: Yolo layer configuration file.
 
         Returns:
             training, inference models
         """
         input_initial = self.apply_func(Input, shape=self.input_shape)
-        x = self.convolution_block(input_initial, 32, 3, 1, True)
-        x = self.convolution_block(x, 64, 3, 2, True)
-        x = self.convolution_block(x, 32, 1, 1, True, 'append')
-        x = self.convolution_block(x, 64, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 3, 2, True)
-        x = self.convolution_block(x, 64, 1, 1, True, 'append')
-        x = self.convolution_block(x, 128, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 64, 1, 1, True, 'append')
-        x = self.convolution_block(x, 128, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 3, 2, True)
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 128, 1, 1, True, 'append')
-        x = self.convolution_block(x, 256, 3, 1, True, 'add')  #
-        skip_36 = x
-        x = self.convolution_block(x, 512, 3, 2, True)
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 256, 1, 1, True, 'append')
-        x = self.convolution_block(x, 512, 3, 1, True, 'add')  #
-        skip_61 = x
-        x = self.convolution_block(x, 1024, 3, 2, True)
-        x = self.convolution_block(x, 512, 1, 1, True, 'append')
-        x = self.convolution_block(x, 1024, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 512, 1, 1, True, 'append')
-        x = self.convolution_block(x, 1024, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 512, 1, 1, True, 'append')
-        x = self.convolution_block(x, 1024, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 512, 1, 1, True, 'append')
-        x = self.convolution_block(x, 1024, 3, 1, True, 'add')  #
-        x = self.convolution_block(x, 512, 1, 1, True)
-        x = self.convolution_block(x, 1024, 3, 1, True)
-        x = self.convolution_block(x, 512, 1, 1, True)
-        x = self.convolution_block(x, 1024, 3, 1, True)
-        x = self.convolution_block(x, 512, 1, 1, True)  #
-        detection_0 = x
-        output_0 = self.output(detection_0, 512)
-        x = self.convolution_block(x, 256, 1, 1, True)  #
-        x = self.apply_func(UpSampling2D, x, size=2)
-        x = self.apply_func(Concatenate, [x, skip_61])
-        x = self.convolution_block(x, 256, 1, 1, True)
-        x = self.convolution_block(x, 512, 3, 1, True)
-        x = self.convolution_block(x, 256, 1, 1, True)
-        x = self.convolution_block(x, 512, 3, 1, True)
-        x = self.convolution_block(x, 256, 1, 1, True)  #
-        detection_1 = x
-        output_1 = self.output(detection_1, 256)
-        x = self.convolution_block(x, 128, 1, 1, True)  #
-        x = self.apply_func(UpSampling2D, x, size=2)
-        x = self.apply_func(Concatenate, [x, skip_36])
-        x = self.convolution_block(x, 128, 1, 1, True)
-        x = self.convolution_block(x, 256, 3, 1, True)
-        x = self.convolution_block(x, 128, 1, 1, True)
-        x = self.convolution_block(x, 256, 3, 1, True)
-        x = self.convolution_block(x, 128, 1, 1, True)
-        detection_2 = x
-        output_2 = self.output(detection_2, 128)
-        self.training_model = Model(
-            input_initial,
-            [output_0, output_1, output_2],
-            name='training_model',
-        )
-        boxes_0 = self.apply_func(
-            Lambda,
-            output_0,
-            lambda item: get_boxes(
-                item, self.anchors[self.masks[0]], self.classes
-            ),
-        )
-        boxes_1 = self.apply_func(
-            Lambda,
-            output_1,
-            lambda item: get_boxes(
-                item, self.anchors[self.masks[1]], self.classes
-            ),
-        )
-        boxes_2 = self.apply_func(
-            Lambda,
-            output_2,
-            lambda item: get_boxes(
-                item, self.anchors[self.masks[2]], self.classes
-            ),
-        )
-        outputs = self.apply_func(
-            Lambda,
-            (boxes_0[:3], boxes_1[:3], boxes_2[:3]),
-            lambda item: self.get_nms(item),
-        )
-        self.inference_model = Model(
-            input_initial, outputs, name='inference_model'
-        )
+        x = input_initial
+        skips, output_layers, detection_layers, training_outs, inference_outs, concats = (
+            {}, [], [], [], [], [])
+        layers = [item.strip() for item in open(configuration).readlines()]
+        layers = list(map(lambda l: l.split(',') if ',' in l else [l], layers))
+        for layer in layers:
+            result = self.create_layer(
+                layer, x, skips, detection_layers, training_outs,
+                concats, input_initial, inference_outs)
+            if result is not None:
+                x = result
         default_logger.info('Training and inference models created')
         return self.training_model, self.inference_model
 
@@ -467,3 +430,9 @@ class V3Model:
             assert len(weights_data.read()) == 0, 'failed to read all data'
         default_logger.info(f'Loaded weights: {weights_file} ... success')
         print()
+
+
+if __name__ == '__main__':
+    mod = V3Model((416, 416, 3), 80)
+    tr, inf = mod.create_models('../Config/yolo3_3o.txt')
+    mod.load_weights('../../../yolov3.weights')
