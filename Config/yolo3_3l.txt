@@ -61,7 +61,7 @@ detection_0
 output_0,512
 conv,256,1,1,True
 upsample
-concat
+concat,skip_61
 conv,256,1,1,True
 conv,512,3,1,True
 conv,256,1,1,True
@@ -71,7 +71,7 @@ detection_1
 output_1,256
 conv,128,1,1,True
 upsample
-concat
+concat,skip_36
 conv,128,1,1,True
 conv,256,3,1,True
 conv,128,1,1,True

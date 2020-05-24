@@ -9,6 +9,8 @@ from tensorflow.keras.layers import (
     Concatenate,
     Lambda,
 )
+import sys
+sys.path.append('..')
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras import Model
 import tensorflow as tf
@@ -27,7 +29,7 @@ class BaseModel:
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3l.txt')
     ):
         """
         Initialize yolo model.
@@ -40,30 +42,34 @@ class BaseModel:
             iou_threshold: Minimum overlap that counts as a valid detection.
             score_threshold: Minimum confidence that counts as a valid detection.
         """
+        assert any(('3' in model_configuration, '4' in model_configuration,
+                    'Invalid model configuration'))
+        self.version_anchors = {
+            'v3': np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45),
+                            (59, 119), (116, 90), (156, 198), (373, 326)], np.float32),
+            'v4': np.array([(12, 16), (19, 36), (40, 28), (36, 75), (76, 55),
+                            (72, 146), (142, 110), (192, 243), (459, 401)])}
+        self.version_masks = {
+            'v3': np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]]),
+            'v4': np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        }
         self.current_layer = 1
         self.input_shape = input_shape
         self.classes = classes
         self.anchors = anchors
         if anchors is None:
-            self.anchors = np.array(
-                [
-                    (10, 13),
-                    (16, 30),
-                    (33, 23),
-                    (30, 61),
-                    (62, 45),
-                    (59, 119),
-                    (116, 90),
-                    (156, 198),
-                    (373, 326),
-                ],
-                np.float32,
-            )
+            if '3' in model_configuration:
+                self.anchors = self.version_anchors['v3']
+            if '4' in model_configuration:
+                self.anchors = self.version_anchors['v4']
         if self.anchors[0][0] > 1:
             self.anchors = self.anchors / input_shape[0]
         self.masks = masks
         if masks is None:
-            self.masks = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
+            if '3' in model_configuration:
+                self.masks = self.version_masks['v3']
+            if '4' in model_configuration:
+                self.masks = self.version_masks['v4']
         self.funcs = (
             ZeroPadding2D,
             BatchNormalization,
@@ -160,7 +166,10 @@ class BaseModel:
         )
         if batch_norm:
             x = self.apply_func(BatchNormalization, x)
-            x = self.apply_func(LeakyReLU, x, alpha=0.1)
+            if '3' in self.model_configuration:
+                x = self.apply_func(LeakyReLU, x, alpha=0.1)
+            if '4' in self.model_configuration:
+                x = self.apply_func(Mish, x)
         if action == 'add':
             return self.apply_func(Add, [self.shortcuts.pop(), x])
         return x
@@ -250,9 +259,9 @@ class BaseModel:
                      skips,
                      detections,
                      training_outputs,
-                     concats,
                      input_initial,
-                     inference_outputs):
+                     inference_outputs,
+                     ):
         if 'conv' in layer_configuration:
             if len(layer_configuration) < 6:
                 layer_configuration = (
@@ -264,10 +273,7 @@ class BaseModel:
                         ([bool(layer_configuration[4])] + [layer_configuration[5]]))
             return self.convolution_block(x, *layer_configuration)
         if 'skip' in layer_configuration[0]:
-            if skips:
-                skips['skip_61'] = x
-            else:
-                skips['skip_36'] = x
+            skips[layer_configuration[0]] = x
         if 'detection' in layer_configuration[0]:
             detections.append(x)
         if 'output' in layer_configuration[0]:
@@ -276,12 +282,8 @@ class BaseModel:
         if 'upsample' in layer_configuration:
             return self.apply_func(UpSampling2D, x, size=2)
         if 'concat' in layer_configuration:
-            if concats:
-                result = self.apply_func(Concatenate, [x, skips['skip_36']])
-            else:
-                result = self.apply_func(Concatenate, [x, skips['skip_61']])
-                concats.append(1)
-            return result
+            target = layer_configuration[1]
+            return self.apply_func(Concatenate, [x, skips[target]])
         if 'training_model' in layer_configuration:
             self.training_model = Model(
                 input_initial,
@@ -321,14 +323,14 @@ class BaseModel:
         """
         input_initial = self.apply_func(Input, shape=self.input_shape)
         x = input_initial
-        skips, output_layers, detection_layers, training_outs, inference_outs, concat = (
-            {}, [], [], [], [], [])
+        skips, output_layers, detection_layers, training_outs, inference_outs = (
+            {}, [], [], [], [])
         layers = [item.strip() for item in open(self.model_configuration).readlines()]
         layers = list(map(lambda l: l.split(',') if ',' in l else [l], layers))
         for layer in layers:
             result = self.create_layer(
                 layer, x, skips, detection_layers, training_outs,
-                concat, input_initial, inference_outs)
+                input_initial, inference_outs)
             if result is not None:
                 x = result
         default_logger.info('Training and inference models created')
@@ -436,5 +438,6 @@ class BaseModel:
 
 if __name__ == '__main__':
     mod = BaseModel((416, 416, 3), 80)
-    tr, inf = mod.create_models('../Config/yolo3_3o.txt')
+    tr, inf = mod.create_models()
     mod.load_weights('../../../yolov3.weights')
+    tr.summary()

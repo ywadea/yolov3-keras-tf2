@@ -43,7 +43,7 @@ class Trainer(BaseModel):
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3o.txt')
+        model_configuration=os.path.join('..', 'Config', 'yolo3_3l.txt')
     ):
         """
         Initialize training.
