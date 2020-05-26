@@ -82,6 +82,7 @@ Here are the **packages** you'll need to install before starting to use the dete
 * numpy==1.18.2
 * matplotlib==3.2.1
 * imgaug==0.4.0
+* imagecorruptions==1.1.0 
 
 ### **Installation**
 
@@ -395,13 +396,13 @@ and if `augmentation` this implies the following:
 
 6- Create new anchor generation configuration(dict) that contains the following keys:
 
-- `anchors_no`: number of anchors(should be 9)
+- `anchor_no`: number of anchors(should be 9)
 and one of the following:
     -  `relative_labels`: same as dataset configuration above
     - `from_xml`: same as dataset configuration above
     
           anchors_conf = {
-                          'anchors_no': 9,
+                          'anchor_no': 9,
                           'relative_labels':  '/path/to/labels.csv'
           }
 

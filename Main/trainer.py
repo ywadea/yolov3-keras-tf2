@@ -129,7 +129,7 @@ class Trainer(V3Model):
         Create new anchors according to given configuration.
         Args:
             new_anchors_conf: A dictionary containing the following keys:
-                - anchors_no
+                - anchor_no
                 and one of the following:
                     - relative_labels
                     - from_xml
