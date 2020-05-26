@@ -8,6 +8,7 @@ from tensorflow.keras.layers import (
     UpSampling2D,
     Concatenate,
     Lambda,
+    MaxPooling2D
 )
 import sys
 sys.path.append('..')
@@ -16,6 +17,9 @@ from tensorflow.keras import Model
 import tensorflow as tf
 import numpy as np
 import os
+import io
+import configparser
+from collections import defaultdict
 from Helpers.utils import get_boxes, timer, default_logger, Mish
 
 
@@ -81,7 +85,8 @@ class BaseModel:
             Concatenate,
             Lambda,
             Model,
-            Mish
+            Mish,
+            MaxPooling2D
         )
         self.func_names = [
             'zero_padding',
@@ -94,13 +99,15 @@ class BaseModel:
             'concat',
             'lambda',
             'model',
-            'mish'
+            'mish',
+            'maxpool2d'
         ]
         self.layer_names = {
             func.__name__: f'layer_CURRENT_LAYER_{name}'
             for func, name in zip(self.funcs, self.func_names)
         }
         self.shortcuts = []
+        self.previous_layer = None
         self.training_model = None
         self.inference_model = None
         self.output_layers = ['output_2', 'output_1', 'output_0']
@@ -132,76 +139,25 @@ class BaseModel:
             return result(x)
         return result
 
-    def convolution_block(
-        self, x, filters, kernel_size, strides, batch_norm, action=None
-    ):
+    def read_dark_net_cfg(self):
         """
-        Convolution block for yolo version3.
-        Args:
-            x: Image input tensor.
-            filters: Number of filters/kernels.
-            kernel_size: Size of the filter/kernel.
-            strides: The number of pixels a filter moves, like a sliding window.
-            batch_norm: Standardizes the inputs to a layer for each mini-batch.
-            action: 'add' or 'append'
+        Read model configuration from DarkNet cfg file.
 
         Returns:
-            x or x added to shortcut.
+            output_stream
         """
-        if action == 'append':
-            self.shortcuts.append(x)
-        padding = 'same'
-        if strides != 1:
-            x = self.apply_func(ZeroPadding2D, x, padding=((1, 0), (1, 0)))
-            padding = 'valid'
-        x = self.apply_func(
-            Conv2D,
-            x,
-            filters=filters,
-            kernel_size=kernel_size,
-            strides=strides,
-            padding=padding,
-            use_bias=not batch_norm,
-            kernel_regularizer=l2(0.0005),
-        )
-        if batch_norm:
-            x = self.apply_func(BatchNormalization, x)
-            if '3' in self.model_configuration:
-                x = self.apply_func(LeakyReLU, x, alpha=0.1)
-            if '4' in self.model_configuration:
-                x = self.apply_func(Mish, x)
-        if action == 'add':
-            return self.apply_func(Add, [self.shortcuts.pop(), x])
-        return x
-
-    def output(self, x_input, filters):
-        """
-        Output layer.
-        Args:
-            x_input: image tensor.
-            filters: number of convolution filters.
-
-        Returns:
-            tf.keras.models.Model
-        """
-        x = inputs = self.apply_func(Input, shape=x_input.shape[1:])
-        x = self.convolution_block(x, 2 * filters, 3, 1, True)
-        x = self.convolution_block(x, 3 * (5 + self.classes), 1, 1, False)
-        x = self.apply_func(
-            Lambda,
-            x,
-            lambda item: tf.reshape(
-                item,
-                (
-                    -1,
-                    tf.shape(item)[1],
-                    tf.shape(item)[2],
-                    3,
-                    self.classes + 5,
-                ),
-            ),
-        )
-        return self.apply_func(Model, x_input, inputs, x)
+        section_counters = defaultdict(int)
+        output_stream = io.StringIO()
+        with open(self.model_configuration) as cfg:
+            for line in cfg:
+                if line.startswith('['):
+                    section = line.strip().strip('[]')
+                    adjusted_section = f'{section}_{section_counters[section]}'
+                    section_counters[section] += 1
+                    line = line.replace(section, adjusted_section)
+                output_stream.write(line)
+        output_stream.seek(0)
+        return output_stream
 
     def get_nms(self, outputs):
         """
@@ -253,65 +209,174 @@ class BaseModel:
         )
         return boxes, scores, classes, valid_detections
 
-    def create_layer(self,
-                     layer_configuration,
-                     x,
-                     skips,
-                     detections,
-                     training_outputs,
-                     input_initial,
-                     inference_outputs,
-                     ):
-        if 'conv' in layer_configuration:
-            if len(layer_configuration) < 6:
-                layer_configuration = (
-                        [int(item) for item in layer_configuration[1: 4]] +
-                        ([bool(layer_configuration[4])]))
-            else:
-                layer_configuration = (
-                        [int(item) for item in layer_configuration[1: 4]] +
-                        ([bool(layer_configuration[4])] + [layer_configuration[5]]))
-            return self.convolution_block(x, *layer_configuration)
-        if 'skip' in layer_configuration[0]:
-            skips[layer_configuration[0]] = x
-        if 'detection' in layer_configuration[0]:
-            detections.append(x)
-        if 'output' in layer_configuration[0]:
-            out = self.output(detections.pop(), int(layer_configuration[1]))
-            training_outputs.append(out)
-        if 'upsample' in layer_configuration:
-            return self.apply_func(UpSampling2D, x, size=2)
-        if 'concat' in layer_configuration:
-            target = layer_configuration[1]
-            return self.apply_func(Concatenate, [x, skips[target]])
-        if 'training_model' in layer_configuration:
-            self.training_model = Model(
-                input_initial,
-                training_outputs,
-                name='training_model',
-            )
-        if 'boxes' in layer_configuration[0]:
-            box_index = int(layer_configuration[0].split('_')[-1])
-            result = self.apply_func(
-                Lambda,
-                training_outputs[box_index],
-                lambda item: get_boxes(
-                    item, self.anchors[self.masks[box_index]], self.classes
-                ),
-            )
-            inference_outputs.append(result)
-        if 'nms' in layer_configuration:
-            inference_outputs = self.apply_func(
-                Lambda,
-                (inference_outputs[0][:3],
-                 inference_outputs[1][:3],
-                 inference_outputs[2][:3]),
-                lambda item: self.get_nms(item),
-            )
-        if 'inference_model' in layer_configuration:
-            self.inference_model = Model(
-                input_initial, inference_outputs, name='inference_model'
-            )
+    def create_convolution(self, cfg_parser, section, all_layers):
+        """
+        Create convolution layers.
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        filters = int(cfg_parser[section]['filters'])
+        size = int(cfg_parser[section]['size'])
+        stride = int(cfg_parser[section]['stride'])
+        pad = int(cfg_parser[section]['pad'])
+        activation = cfg_parser[section]['activation']
+        batch_normalize = 'batch_normalize' in cfg_parser[section]
+        padding = 'same' if pad == 1 and stride == 1 else 'valid'
+        if stride > 1:
+            self.previous_layer = self.apply_func(
+                ZeroPadding2D,
+                self.previous_layer, ((1, 0), (1, 0)))
+        convolution_layer = self.apply_func(
+            Conv2D,
+            self.previous_layer,
+            filters=filters,
+            kernel_size=size,
+            strides=(stride, stride),
+            use_bias=not batch_normalize,
+            padding=padding
+        )
+        if batch_normalize:
+            convolution_layer = self.apply_func(BatchNormalization, convolution_layer)
+        self.previous_layer = convolution_layer
+        if activation == 'linear':
+            all_layers.append(self.previous_layer)
+        if activation == 'leaky':
+            act_layer = self.apply_func(LeakyReLU, self.previous_layer, alpha=0.1)
+            self.previous_layer = act_layer
+            all_layers.append(act_layer)
+        if activation == 'mish':
+            act_layer = self.apply_func(Mish, self.previous_layer)
+            self.previous_layer = act_layer
+            all_layers.append(act_layer)
+    
+    def create_route(self, cfg_parser, section, all_layers):
+        """
+        Create concatenation layer.
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        ids = [int(i) for i in cfg_parser[section]['layers'].split(',')]
+        layers = [all_layers[i] for i in ids]
+        if len(layers) > 1:
+            concatenate_layer = self.apply_func(Concatenate, layers)
+            all_layers.append(concatenate_layer)
+            self.previous_layer = concatenate_layer
+        else:
+            skip_layer = layers[0]
+            all_layers.append(skip_layer)
+            self.previous_layer = skip_layer
+
+    def create_max_pool(self, cfg_parser, section, all_layers):
+        """
+        Create max pooling layer.
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        size = int(cfg_parser[section]['size'])
+        stride = int(cfg_parser[section]['stride'])
+        layer = self.apply_func(
+            MaxPooling2D,
+            self.previous_layer,
+            pool_size=(size, size),
+            strides=(stride, stride),
+            padding='same'
+        )
+        all_layers.append(
+            MaxPooling2D(
+                pool_size=(size, size),
+                strides=(stride, stride),
+                padding='same')(self.previous_layer))
+        all_layers.append(layer)
+        self.previous_layer = layer
+
+    def create_shortcut(self, cfg_parser, section, all_layers):
+        """
+        Create shortcut layer.
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        index = int(cfg_parser[section]['from'])
+        activation = cfg_parser[section]['activation']
+        assert activation == 'linear', 'Only linear activation supported.'
+        layer = self.apply_func(Add, [all_layers[index], self.previous_layer])
+        all_layers.append(layer)
+        self.previous_layer = layer
+
+    def create_up_sample(self, cfg_parser, section, all_layers):
+        """
+        Create up sample layer
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        stride = int(cfg_parser[section]['stride'])
+        assert stride == 2, 'Only stride=2 supported.'
+        layer = self.apply_func(UpSampling2D, self.previous_layer, stride)
+        all_layers.append(layer)
+        self.previous_layer = layer
+
+    def create_output_layer(self, output_indices, all_layers):
+        """
+        Create output layer.
+        Args:
+            output_indices: A list of output layer indices.
+            all_layers: A list of all current layers.
+
+        Returns:
+            None
+        """
+        output_indices.append(len(all_layers) - 1)
+        all_layers.append(None)
+        self.previous_layer = all_layers[-1]
+
+    def create_section(self, section, cfg_parser, all_layers, training_output_indices):
+        """
+        Create a section from the model configuration file.
+        Args:
+            cfg_parser: Model configuration cfg parser.
+            section: cfg section
+            all_layers: A list of all current layers.
+            training_output_indices: A list of output layer indices.
+
+        Returns:
+            None
+        """
+        if section.startswith('convolutional'):
+            self.create_convolution(cfg_parser, section, all_layers)
+        if section.startswith('route'):
+            self.create_route(cfg_parser, section, all_layers)
+        if section.startswith('maxpool'):
+            self.create_max_pool(cfg_parser, section, all_layers)
+        if section.startswith('shortcut'):
+            self.create_shortcut(cfg_parser, section, all_layers)
+        if section.startswith('upsample'):
+            self.create_up_sample(cfg_parser, section, all_layers)
+        if section.startswith('yolo'):
+            self.create_output_layer(training_output_indices, all_layers)
 
     @timer(default_logger)
     def create_models(self):
@@ -322,17 +387,18 @@ class BaseModel:
             training, inference models
         """
         input_initial = self.apply_func(Input, shape=self.input_shape)
-        x = input_initial
-        skips, output_layers, detection_layers, training_outs, inference_outs = (
-            {}, [], [], [], [])
-        layers = [item.strip() for item in open(self.model_configuration).readlines()]
-        layers = list(map(lambda l: l.split(',') if ',' in l else [l], layers))
-        for layer in layers:
-            result = self.create_layer(
-                layer, x, skips, detection_layers, training_outs,
-                input_initial, inference_outs)
-            if result is not None:
-                x = result
+        cfg_out = self.read_dark_net_cfg()
+        cfg_parser = configparser.ConfigParser()
+        cfg_parser.read_file(cfg_out)
+        all_layers, training_output_indices = [], []
+        self.previous_layer = input_initial
+        for section in cfg_parser.sections():
+            self.create_section(section, cfg_parser, all_layers, training_output_indices)
+        if len(training_output_indices) == 0: 
+            training_output_indices.append(len(all_layers) - 1)
+        self.training_model = Model(
+            inputs=input_initial, 
+            outputs=[all_layers[i] for i in training_output_indices])
         default_logger.info('Training and inference models created')
         return self.training_model, self.inference_model
 
@@ -437,7 +503,7 @@ class BaseModel:
 
 
 if __name__ == '__main__':
-    mod = BaseModel((416, 416, 3), 80)
+    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo3.cfg')
     tr, inf = mod.create_models()
-    mod.load_weights('../../../yolov3.weights')
+    # mod.load_weights('../../../yolov3.weights')
     tr.summary()

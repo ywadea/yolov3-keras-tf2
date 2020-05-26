@@ -30,52 +30,26 @@ class Trainer(BaseModel):
     Create a training instance.
     """
 
-    def __init__(
-        self,
-        input_shape,
-        classes_file,
-        image_width,
-        image_height,
-        train_tf_record=None,
-        valid_tf_record=None,
-        anchors=None,
-        masks=None,
-        max_boxes=100,
-        iou_threshold=0.5,
-        score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3l.txt')
-    ):
+    def __init__(self, input_shape, model_configuration, classes=80, anchors=None, masks=None, max_boxes=100,
+                 iou_threshold=0.5, score_threshold=0.5):
         """
         Initialize training.
         Args:
+            model_configuration:
             input_shape: tuple, (n, n, c)
-            classes_file: File containing class names \n delimited.
-            image_width: Width of the original image.
-            image_height: Height of the original image.
-            train_tf_record: TFRecord file.
-            valid_tf_record: TFRecord file.
             anchors: numpy array of (w, h) pairs.
             masks: numpy array of masks.
             max_boxes: Maximum boxes of the TFRecords provided(if any) or
                 maximum boxes setting.
             iou_threshold: float, values less than the threshold are ignored.
             score_threshold: float, values less than the threshold are ignored.
-            model_configuration: Path to model configuration file.
         """
         self.classes_file = classes_file
         self.class_names = [
             item.strip() for item in open(classes_file).readlines()
         ]
-        super().__init__(
-            input_shape,
-            len(self.class_names),
-            anchors,
-            masks,
-            max_boxes,
-            iou_threshold,
-            score_threshold,
-            model_configuration
-        )
+        super().__init__(input_shape, None, len(self.class_names), anchors, masks, max_boxes, iou_threshold,
+                         score_threshold)
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
         self.image_folder = (
@@ -283,17 +257,8 @@ class Trainer(BaseModel):
             stats, map_score.
         """
         default_logger.info('Starting evaluation ...')
-        evaluator = Evaluator(
-            self.input_shape,
-            self.train_tf_record,
-            self.valid_tf_record,
-            self.classes_file,
-            self.anchors,
-            self.masks,
-            self.max_boxes,
-            self.iou_threshold,
-            self.score_threshold,
-        )
+        evaluator = Evaluator(self.input_shape, None, self.train_tf_record, self.valid_tf_record, self.classes_file,
+                              self.anchors, self.masks, self.max_boxes)
         predictions = evaluator.make_predictions(
             weights_file, merge, workers, shuffle_buffer
         )
@@ -516,28 +481,9 @@ class Trainer(BaseModel):
         )
         callbacks = self.create_callbacks(checkpoint_name)
         if n_epoch_eval:
-            mid_train_eval = MidTrainingEvaluator(
-                self.input_shape,
-                self.classes_file,
-                self.image_width,
-                self.image_height,
-                self.train_tf_record,
-                self.valid_tf_record,
-                self.anchors,
-                self.masks,
-                self.max_boxes,
-                self.iou_threshold,
-                self.score_threshold,
-                n_epoch_eval,
-                merge_evaluation,
-                evaluation_workers,
-                shuffle_buffer,
-                min_overlaps,
-                display_stats,
-                plot_stats,
-                save_figs,
-                checkpoint_name,
-            )
+            mid_train_eval = MidTrainingEvaluator(self.input_shape, None, self.classes_file, self.image_width,
+                                                  self.image_height, self.train_tf_record, self.valid_tf_record,
+                                                  self.anchors)
             callbacks.append(mid_train_eval)
         history = self.training_model.fit(
             training_dataset,
@@ -566,71 +512,21 @@ class MidTrainingEvaluator(Callback, Trainer):
     Tool to evaluate trained model on the go(during the training, every n epochs).
     """
 
-    def __init__(
-        self,
-        input_shape,
-        classes_file,
-        image_width,
-        image_height,
-        train_tf_record,
-        valid_tf_record,
-        anchors,
-        masks,
-        max_boxes,
-        iou_threshold,
-        score_threshold,
-        n_epochs,
-        merge,
-        workers,
-        shuffle_buffer,
-        min_overlaps,
-        display_stats,
-        plot_stats,
-        save_figs,
-        weights_file,
-    ):
+    def __init__(self, input_shape, model_configuration, classes=80, anchors=None, masks=None, max_boxes=100,
+                 iou_threshold=0.5, score_threshold=0.5):
         """
         Initialize mid-training evaluation settings.
         Args:
+            model_configuration:
             input_shape: tuple, (n, n, c)
-            classes_file: File containing class names \n delimited.
-            image_width: Width of the original image.
-            image_height: Height of the original image.
-            train_tf_record: TFRecord file.
-            valid_tf_record: TFRecord file.
             anchors: numpy array of (w, h) pairs.
             masks: numpy array of masks.
             max_boxes: Maximum boxes of the TFRecords provided(if any) or
                 maximum boxes setting.
             iou_threshold: float, values less than the threshold are ignored.
             score_threshold: float, values less than the threshold are ignored.
-            n_epochs: int, perform evaluation every n epochs
-            merge: If True, The whole dataset(train + valid) will be evaluated
-            workers: Parallel predictions
-            shuffle_buffer: Buffer size for shuffling datasets
-            min_overlaps: a float value between 0 and 1, or a dictionary
-                containing each class in self.class_names mapped to its
-                minimum overlap
-            display_stats: If True, statistics will be displayed at the end.
-            plot_stats: If True, precision and recall curves as well as
-                comparison bar charts will be plotted.
-            save_figs: If True and display_stats, plots will be save to Output folder
-            weights_file: .tf file(most recent checkpoint)
         """
-        Trainer.__init__(
-            self,
-            input_shape,
-            classes_file,
-            image_width,
-            image_height,
-            train_tf_record,
-            valid_tf_record,
-            anchors,
-            masks,
-            max_boxes,
-            iou_threshold,
-            score_threshold,
-        )
+        Trainer.__init__(image_width, None, image_height, train_tf_record, valid_tf_record, anchors)
         self.n_epochs = n_epochs
         self.evaluation_args = [
             weights_file,
