@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import os
 import sys
-
 sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from Main.models import BaseModel
@@ -22,6 +21,7 @@ class Evaluator(BaseModel):
     def __init__(
         self,
         input_shape,
+        model_configuration,
         train_tf_record,
         valid_tf_record,
         classes_file,
@@ -30,12 +30,12 @@ class Evaluator(BaseModel):
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_30.txt')
     ):
         """
         Evaluate a trained model.
         Args:
             input_shape: input_shape: tuple, (n, n, c)
+            model_configuration: Path to model configuration file.
             train_tf_record: Path to training TFRecord file.
             valid_tf_record: Path to validation TFRecord file.
             classes_file: File containing class names \n delimited.
@@ -45,22 +45,13 @@ class Evaluator(BaseModel):
             iou_threshold: Minimum overlap value.
             score_threshold: Minimum confidence for detection to count
                 as true positive.
-            model_configuration: Path to model configuration file.
         """
         self.classes_file = classes_file
         self.class_names = [
             item.strip() for item in open(classes_file).readlines()
         ]
-        super().__init__(
-            input_shape,
-            len(self.class_names),
-            anchors,
-            masks,
-            max_boxes,
-            iou_threshold,
-            score_threshold,
-            model_configuration
-        )
+        super().__init__(input_shape, model_configuration, len(self.class_names),
+                         anchors, masks, max_boxes, iou_threshold, score_threshold)
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
         self.train_dataset_size = sum(

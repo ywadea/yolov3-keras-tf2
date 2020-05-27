@@ -27,18 +27,19 @@ class BaseModel:
     def __init__(
         self,
         input_shape,
+        model_configuration,
         classes=80,
         anchors=None,
         masks=None,
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3l.txt')
     ):
         """
         Initialize yolo model.
         Args:
             input_shape: tuple(n, n, c)
+            model_configuration: Path to DarkNet cfg file containing configuration.
             classes: Number of classes(defaults to 80 for Coco objects)
             anchors: numpy array of anchors (x, y) pairs
             masks: numpy array of masks.
@@ -108,11 +109,13 @@ class BaseModel:
         self.previous_layer = None
         self.training_model = None
         self.inference_model = None
+        self.output_indices = []
         self.output_layers = []
         self.max_boxes = max_boxes
         self.iou_threshold = iou_threshold
         self.score_threshold = score_threshold
         self.model_configuration = model_configuration
+        self.model_layers = []
 
     def apply_func(self, func, x=None, *args, **kwargs):
         """
@@ -205,13 +208,12 @@ class BaseModel:
         )
         return boxes, scores, classes, valid_detections
 
-    def create_convolution(self, cfg_parser, section, all_layers):
+    def create_convolution(self, cfg_parser, section):
         """
         Create convolution layers.
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
 
         Returns:
             None
@@ -236,51 +238,50 @@ class BaseModel:
             kernel_size=size,
             strides=(stride, stride),
             use_bias=not batch_normalize,
-            padding=padding
+            padding=padding,
+            kernel_regularizer=l2(0.0005)
         )
         if batch_normalize:
             convolution_layer = self.apply_func(BatchNormalization, convolution_layer)
         self.previous_layer = convolution_layer
         if activation == 'linear':
-            all_layers.append(self.previous_layer)
+            self.model_layers.append(self.previous_layer)
         if activation == 'leaky':
             act_layer = self.apply_func(LeakyReLU, self.previous_layer, alpha=0.1)
             self.previous_layer = act_layer
-            all_layers.append(act_layer)
+            self.model_layers.append(act_layer)
         if activation == 'mish':
             act_layer = self.apply_func(Mish, self.previous_layer)
             self.previous_layer = act_layer
-            all_layers.append(act_layer)
+            self.model_layers.append(act_layer)
     
-    def create_route(self, cfg_parser, section, all_layers):
+    def create_route(self, cfg_parser, section):
         """
         Create concatenation layer.
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
 
         Returns:
             None
         """
         ids = [int(i) for i in cfg_parser[section]['layers'].split(',')]
-        layers = [all_layers[i] for i in ids]
+        layers = [self.model_layers[i] for i in ids]
         if len(layers) > 1:
             concatenate_layer = self.apply_func(Concatenate, layers)
-            all_layers.append(concatenate_layer)
+            self.model_layers.append(concatenate_layer)
             self.previous_layer = concatenate_layer
         else:
             skip_layer = layers[0]
-            all_layers.append(skip_layer)
+            self.model_layers.append(skip_layer)
             self.previous_layer = skip_layer
 
-    def create_max_pool(self, cfg_parser, section, all_layers):
+    def create_max_pool(self, cfg_parser, section):
         """
         Create max pooling layer.
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
 
         Returns:
             None
@@ -294,16 +295,15 @@ class BaseModel:
             strides=(stride, stride),
             padding='same'
         )
-        all_layers.append(layer)
+        self.model_layers.append(layer)
         self.previous_layer = layer
 
-    def create_shortcut(self, cfg_parser, section, all_layers):
+    def create_shortcut(self, cfg_parser, section):
         """
         Create shortcut layer.
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
 
         Returns:
             None
@@ -311,17 +311,16 @@ class BaseModel:
         index = int(cfg_parser[section]['from'])
         activation = cfg_parser[section]['activation']
         assert activation == 'linear', 'Only linear activation supported.'
-        layer = self.apply_func(Add, [all_layers[index], self.previous_layer])
-        all_layers.append(layer)
+        layer = self.apply_func(Add, [self.model_layers[index], self.previous_layer])
+        self.model_layers.append(layer)
         self.previous_layer = layer
 
-    def create_up_sample(self, cfg_parser, section, all_layers):
+    def create_up_sample(self, cfg_parser, section):
         """
         Create up sample layer
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
 
         Returns:
             None
@@ -329,50 +328,45 @@ class BaseModel:
         stride = int(cfg_parser[section]['stride'])
         assert stride == 2, 'Only stride=2 supported.'
         layer = self.apply_func(UpSampling2D, self.previous_layer, stride)
-        all_layers.append(layer)
+        self.model_layers.append(layer)
         self.previous_layer = layer
 
-    def create_output_layer(self, output_indices, all_layers):
+    def create_output_layer(self):
         """
         Create output layer.
-        Args:
-            output_indices: A list of output layer indices.
-            all_layers: A list of all current layers.
 
         Returns:
             None
         """
-        output_indices.append(len(all_layers))
-        x = all_layers[-1]
+        self.output_indices.append(len(self.model_layers))
+        x = self.model_layers[-1]
         x = self.apply_func(Lambda, x, lambda item: tf.reshape(item, (
-            -1, tf.shape(item)[1], tf.shape(item)[2], 3, self.classes + 5,),),)
-        all_layers.append(x)
-        self.previous_layer = all_layers[-1]
+            -1, tf.shape(item)[1], tf.shape(item)[2], 3, self.classes + 5)))
+        self.model_layers.append(x)
+        self.previous_layer = self.model_layers[-1]
 
-    def create_section(self, section, cfg_parser, all_layers, training_output_indices):
+    def create_section(self, section, cfg_parser):
         """
         Create a section from the model configuration file.
         Args:
             cfg_parser: Model configuration cfg parser.
             section: cfg section
-            all_layers: A list of all current layers.
-            training_output_indices: A list of output layer indices.
 
         Returns:
             None
         """
         if section.startswith('convolutional'):
-            self.create_convolution(cfg_parser, section, all_layers)
+            self.create_convolution(cfg_parser, section)
         if section.startswith('route'):
-            self.create_route(cfg_parser, section, all_layers)
+            self.create_route(cfg_parser, section)
         if section.startswith('maxpool'):
-            self.create_max_pool(cfg_parser, section, all_layers)
+            self.create_max_pool(cfg_parser, section)
         if section.startswith('shortcut'):
-            self.create_shortcut(cfg_parser, section, all_layers)
+            self.create_shortcut(cfg_parser, section)
         if section.startswith('upsample'):
-            self.create_up_sample(cfg_parser, section, all_layers)
+            self.create_up_sample(cfg_parser, section)
         if section.startswith('yolo'):
-            self.create_output_layer(training_output_indices, all_layers)
+            self.create_output_layer()
 
     @timer(default_logger)
     def create_models(self):
@@ -386,13 +380,13 @@ class BaseModel:
         cfg_out = self.read_dark_net_cfg()
         cfg_parser = configparser.ConfigParser()
         cfg_parser.read_file(cfg_out)
-        all_layers, training_output_indices = [], []
+        self.output_indices = []
         self.previous_layer = input_initial
         for section in cfg_parser.sections():
-            self.create_section(section, cfg_parser, all_layers, training_output_indices)
-        if len(training_output_indices) == 0: 
-            training_output_indices.append(len(all_layers) - 1)
-        self.output_layers.extend([all_layers[i] for i in training_output_indices])
+            self.create_section(section, cfg_parser)
+        if len(self.output_indices) == 0: 
+            self.output_indices.append(len(self.model_layers) - 1)
+        self.output_layers.extend([self.model_layers[i] for i in self.output_indices])
         self.training_model = Model(
             inputs=input_initial, 
             outputs=self.output_layers)
@@ -455,25 +449,26 @@ class BaseModel:
             major, minor, revision, seen, _ = np.fromfile(
                 weights_data, dtype=np.int32, count=5
             )
-            all_layers = [
+            self.model_layers = [
                 layer
                 for layer in self.training_model.layers
                 if id(layer) not in [id(item) for item in self.output_layers]
             ]
-            all_layers.sort(key=lambda layer: int(layer.name.split('_')[1]))
-            all_layers.extend(self.output_layers)
-            for i, layer in enumerate(all_layers):
+            self.model_layers.sort(key=lambda layer: int(layer.name.split('_')[1]))
+            self.model_layers.extend(self.output_layers)
+            for i, layer in enumerate(self.model_layers):
                 current_read = weights_data.tell()
                 total_size = os.fstat(weights_data.fileno()).st_size
                 if current_read == total_size:
                     break
                 print(
-                    f'\r{round(100 * (current_read / total_size))}%\t{current_read}/{total_size}',
+                    f'\r{round(100 * (current_read / total_size))}%\
+                    t{current_read}/{total_size}',
                     end='',
                 )
                 if 'conv2d' not in layer.name:
                     continue
-                next_layer = all_layers[i + 1]
+                next_layer = self.model_layers[i + 1]
                 b_norm_layer = (
                     next_layer
                     if 'batch_normalization' in next_layer.name
@@ -522,10 +517,3 @@ class BaseModel:
             assert len(weights_data.read()) == 0, 'failed to read all data'
         default_logger.info(f'Loaded weights: {weights_file} ... success')
         print()
-
-
-if __name__ == '__main__':
-    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo3.cfg')
-    tr, inf = mod.create_models()
-    mod.load_weights('../../../yolov3.weights')
-    inf.summary()

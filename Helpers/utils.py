@@ -432,7 +432,7 @@ def calculate_display_data(
 @keras_export('keras.layers.Mish')
 class Mish(Layer):
     """
-    Mish activation
+    Mish new activation function
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

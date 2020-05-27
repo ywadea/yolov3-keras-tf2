@@ -19,19 +19,20 @@ class Detector(BaseModel):
     def __init__(
         self,
         input_shape,
+        model_configuration,
         classes_file,
         anchors=None,
         masks=None,
         max_boxes=100,
         iou_threshold=0.5,
         score_threshold=0.5,
-        model_configuration=os.path.join('..', 'Config', 'yolo3_3l.txt')
     ):
         """
         Initialize detection settings.
 
         Args:
             input_shape: tuple, (n, n, c)
+            model_configuration: Path to DarkNet cfg file.
             classes_file: File containing class names \n delimited.
             anchors: numpy array of (w, h) pairs.
             masks: numpy array of masks.
@@ -39,7 +40,6 @@ class Detector(BaseModel):
                 maximum boxes setting.
             iou_threshold: float, values less than the threshold are ignored.
             score_threshold: float, values less than the threshold are ignored.
-            model_configuration: Path to model configuration file.
         """
         self.class_names = [
             item.strip() for item in open(classes_file).readlines()
@@ -56,13 +56,13 @@ class Detector(BaseModel):
         }
         super().__init__(
             input_shape=input_shape,
+            model_configuration=model_configuration,
             classes=len(self.class_names),
             anchors=anchors,
             masks=masks,
             max_boxes=max_boxes,
             iou_threshold=iou_threshold,
             score_threshold=score_threshold,
-            model_configuration=model_configuration
         )
         activate_gpu()
 
