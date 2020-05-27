@@ -84,7 +84,6 @@ class BaseModel:
             UpSampling2D,
             Concatenate,
             Lambda,
-            Model,
             Mish,
             MaxPooling2D
         )
@@ -98,7 +97,6 @@ class BaseModel:
             'up_sample',
             'concat',
             'lambda',
-            'model',
             'mish',
             'maxpool2d'
         ]
@@ -110,7 +108,7 @@ class BaseModel:
         self.previous_layer = None
         self.training_model = None
         self.inference_model = None
-        self.output_layers = ['output_2', 'output_1', 'output_0']
+        self.output_layers = []
         self.max_boxes = max_boxes
         self.iou_threshold = iou_threshold
         self.score_threshold = score_threshold
@@ -131,8 +129,6 @@ class BaseModel:
         name = self.layer_names[func.__name__].replace(
             'CURRENT_LAYER', f'{self.current_layer}'
         )
-        if func.__name__ == 'Model':
-            name = f'layer_{self.current_layer}_{self.output_layers.pop()}'
         result = func(name=name, *args, **kwargs)
         self.current_layer += 1
         if x is not None:
@@ -227,6 +223,8 @@ class BaseModel:
         activation = cfg_parser[section]['activation']
         batch_normalize = 'batch_normalize' in cfg_parser[section]
         padding = 'same' if pad == 1 and stride == 1 else 'valid'
+        if filters == 255:
+            filters = 3 * (self.classes + 5)
         if stride > 1:
             self.previous_layer = self.apply_func(
                 ZeroPadding2D,
@@ -296,11 +294,6 @@ class BaseModel:
             strides=(stride, stride),
             padding='same'
         )
-        all_layers.append(
-            MaxPooling2D(
-                pool_size=(size, size),
-                strides=(stride, stride),
-                padding='same')(self.previous_layer))
         all_layers.append(layer)
         self.previous_layer = layer
 
@@ -396,9 +389,10 @@ class BaseModel:
             self.create_section(section, cfg_parser, all_layers, training_output_indices)
         if len(training_output_indices) == 0: 
             training_output_indices.append(len(all_layers) - 1)
+        self.output_layers.extend([all_layers[i] for i in training_output_indices])
         self.training_model = Model(
             inputs=input_initial, 
-            outputs=[all_layers[i] for i in training_output_indices])
+            outputs=self.output_layers)
         default_logger.info('Training and inference models created')
         return self.training_model, self.inference_model
 
@@ -431,20 +425,15 @@ class BaseModel:
             all_layers = [
                 layer
                 for layer in self.training_model.layers
-                if 'output' not in layer.name
+                if id(layer) not in [id(item) for item in self.output_layers]
             ]
-            output_models = [
-                layer
-                for layer in self.training_model.layers
-                if 'output' in layer.name
-            ]
-            output_layers = [item.layers for item in output_models]
-            for output_item in output_layers:
-                all_layers.extend(output_item)
             all_layers.sort(key=lambda layer: int(layer.name.split('_')[1]))
+            all_layers.extend(self.output_layers)
             for i, layer in enumerate(all_layers):
                 current_read = weights_data.tell()
                 total_size = os.fstat(weights_data.fileno()).st_size
+                if current_read == total_size:
+                    break
                 print(
                     f'\r{round(100 * (current_read / total_size))}%\t{current_read}/{total_size}',
                     end='',
@@ -503,7 +492,7 @@ class BaseModel:
 
 
 if __name__ == '__main__':
-    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo3.cfg')
+    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo4.cfg')
     tr, inf = mod.create_models()
-    # mod.load_weights('../../../yolov3.weights')
+    mod.load_weights('../../../yolov4.weights')
     tr.summary()
