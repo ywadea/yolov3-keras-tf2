@@ -342,8 +342,11 @@ class BaseModel:
         Returns:
             None
         """
-        output_indices.append(len(all_layers) - 1)
-        all_layers.append(None)
+        output_indices.append(len(all_layers))
+        x = all_layers[-1]
+        x = self.apply_func(Lambda, x, lambda item: tf.reshape(item, (
+            -1, tf.shape(item)[1], tf.shape(item)[2], 3, self.classes + 5,),),)
+        all_layers.append(x)
         self.previous_layer = all_layers[-1]
 
     def create_section(self, section, cfg_parser, all_layers, training_output_indices):
@@ -393,6 +396,36 @@ class BaseModel:
         self.training_model = Model(
             inputs=input_initial, 
             outputs=self.output_layers)
+        output_0, output_1, output_2 = self.output_layers
+        boxes_0 = self.apply_func(
+            Lambda,
+            output_0,
+            lambda item: get_boxes(
+                item, self.anchors[self.masks[0]], self.classes
+            ),
+        )
+        boxes_1 = self.apply_func(
+            Lambda,
+            output_1,
+            lambda item: get_boxes(
+                item, self.anchors[self.masks[1]], self.classes
+            ),
+        )
+        boxes_2 = self.apply_func(
+            Lambda,
+            output_2,
+            lambda item: get_boxes(
+                item, self.anchors[self.masks[2]], self.classes
+            ),
+        )
+        outputs = self.apply_func(
+            Lambda,
+            (boxes_0[:3], boxes_1[:3], boxes_2[:3]),
+            lambda item: self.get_nms(item),
+        )
+        self.inference_model = Model(
+            input_initial, outputs, name='inference_model'
+        )
         default_logger.info('Training and inference models created')
         return self.training_model, self.inference_model
 
@@ -492,7 +525,7 @@ class BaseModel:
 
 
 if __name__ == '__main__':
-    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo4.cfg')
+    mod = BaseModel((416, 416, 3), 80, model_configuration='../Config/yolo3.cfg')
     tr, inf = mod.create_models()
-    mod.load_weights('../../../yolov4.weights')
-    tr.summary()
+    mod.load_weights('../../../yolov3.weights')
+    inf.summary()
