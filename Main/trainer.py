@@ -125,18 +125,14 @@ class Trainer(BaseModel):
         """
         Create new anchors according to given configuration.
         Args:
-<<<<<<< HEAD
             new_anchors_conf: A dictionary containing the following keys:
                 - anchor_no
                 and one of the following:
                     - relative_labels
                     - from_xml
                     - adjusted_frame
-
-=======
             new_anchors_conf: A dictionary with the following keys:
             - anchor_no: number of anchors to generate
->>>>>>> v4
         Returns:
             None
         """
