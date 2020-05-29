@@ -17,6 +17,8 @@ from tensorflow.python.util.tf_export import keras_export
 import tensorflow_addons as tfa
 from tensorflow.python.keras.utils import tf_utils
 
+tfa.options.TF_ADDONS_PY_OPS = True
+
 
 def get_logger():
     """
@@ -434,6 +436,7 @@ class Mish(Layer):
     """
     Mish new activation function
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.supports_masking = True
@@ -444,4 +447,3 @@ class Mish(Layer):
     @tf_utils.shape_type_conversion
     def compute_output_shape(self, input_shape):
         return input_shape
-

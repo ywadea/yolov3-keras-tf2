@@ -2,6 +2,9 @@ import numpy as np
 import cv2
 import tensorflow as tf
 import os
+import sys
+
+sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from Main.models import BaseModel
 from Helpers.utils import (

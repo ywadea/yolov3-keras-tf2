@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import sys
+
 sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from Main.models import BaseModel
@@ -50,8 +51,16 @@ class Evaluator(BaseModel):
         self.class_names = [
             item.strip() for item in open(classes_file).readlines()
         ]
-        super().__init__(input_shape, model_configuration, len(self.class_names),
-                         anchors, masks, max_boxes, iou_threshold, score_threshold)
+        super().__init__(
+            input_shape,
+            model_configuration,
+            len(self.class_names),
+            anchors,
+            masks,
+            max_boxes,
+            iou_threshold,
+            score_threshold,
+        )
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
         self.train_dataset_size = sum(

@@ -8,9 +8,10 @@ from tensorflow.keras.layers import (
     UpSampling2D,
     Concatenate,
     Lambda,
-    MaxPooling2D
+    MaxPooling2D,
 )
 import sys
+
 sys.path.append('..')
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras import Model
@@ -47,16 +48,45 @@ class BaseModel:
             iou_threshold: Minimum overlap that counts as a valid detection.
             score_threshold: Minimum confidence that counts as a valid detection.
         """
-        assert any(('3' in model_configuration, '4' in model_configuration,
-                    'Invalid model configuration'))
+        assert any(
+            (
+                '3' in model_configuration,
+                '4' in model_configuration,
+                'Invalid model configuration',
+            )
+        )
         self.version_anchors = {
-            'v3': np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45),
-                            (59, 119), (116, 90), (156, 198), (373, 326)], np.float32),
-            'v4': np.array([(12, 16), (19, 36), (40, 28), (36, 75), (76, 55),
-                            (72, 146), (142, 110), (192, 243), (459, 401)])}
+            'v3': np.array(
+                [
+                    (10, 13),
+                    (16, 30),
+                    (33, 23),
+                    (30, 61),
+                    (62, 45),
+                    (59, 119),
+                    (116, 90),
+                    (156, 198),
+                    (373, 326),
+                ],
+                np.float32,
+            ),
+            'v4': np.array(
+                [
+                    (12, 16),
+                    (19, 36),
+                    (40, 28),
+                    (36, 75),
+                    (76, 55),
+                    (72, 146),
+                    (142, 110),
+                    (192, 243),
+                    (459, 401),
+                ]
+            ),
+        }
         self.version_masks = {
             'v3': np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]]),
-            'v4': np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+            'v4': np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]]),
         }
         self.current_layer = 1
         self.input_shape = input_shape
@@ -86,7 +116,7 @@ class BaseModel:
             Concatenate,
             Lambda,
             Mish,
-            MaxPooling2D
+            MaxPooling2D,
         )
         self.func_names = [
             'zero_padding',
@@ -99,7 +129,7 @@ class BaseModel:
             'concat',
             'lambda',
             'mish',
-            'maxpool2d'
+            'maxpool2d',
         ]
         self.layer_names = {
             func.__name__: f'layer_CURRENT_LAYER_{name}'
@@ -229,8 +259,8 @@ class BaseModel:
             filters = 3 * (self.classes + 5)
         if stride > 1:
             self.previous_layer = self.apply_func(
-                ZeroPadding2D,
-                self.previous_layer, ((1, 0), (1, 0)))
+                ZeroPadding2D, self.previous_layer, ((1, 0), (1, 0))
+            )
         convolution_layer = self.apply_func(
             Conv2D,
             self.previous_layer,
@@ -239,22 +269,26 @@ class BaseModel:
             strides=(stride, stride),
             use_bias=not batch_normalize,
             padding=padding,
-            kernel_regularizer=l2(0.0005)
+            kernel_regularizer=l2(0.0005),
         )
         if batch_normalize:
-            convolution_layer = self.apply_func(BatchNormalization, convolution_layer)
+            convolution_layer = self.apply_func(
+                BatchNormalization, convolution_layer
+            )
         self.previous_layer = convolution_layer
         if activation == 'linear':
             self.model_layers.append(self.previous_layer)
         if activation == 'leaky':
-            act_layer = self.apply_func(LeakyReLU, self.previous_layer, alpha=0.1)
+            act_layer = self.apply_func(
+                LeakyReLU, self.previous_layer, alpha=0.1
+            )
             self.previous_layer = act_layer
             self.model_layers.append(act_layer)
         if activation == 'mish':
             act_layer = self.apply_func(Mish, self.previous_layer)
             self.previous_layer = act_layer
             self.model_layers.append(act_layer)
-    
+
     def create_route(self, cfg_parser, section):
         """
         Create concatenation layer.
@@ -293,7 +327,7 @@ class BaseModel:
             self.previous_layer,
             pool_size=(size, size),
             strides=(stride, stride),
-            padding='same'
+            padding='same',
         )
         self.model_layers.append(layer)
         self.previous_layer = layer
@@ -311,7 +345,9 @@ class BaseModel:
         index = int(cfg_parser[section]['from'])
         activation = cfg_parser[section]['activation']
         assert activation == 'linear', 'Only linear activation supported.'
-        layer = self.apply_func(Add, [self.model_layers[index], self.previous_layer])
+        layer = self.apply_func(
+            Add, [self.model_layers[index], self.previous_layer]
+        )
         self.model_layers.append(layer)
         self.previous_layer = layer
 
@@ -340,8 +376,20 @@ class BaseModel:
         """
         self.output_indices.append(len(self.model_layers))
         x = self.model_layers[-1]
-        x = self.apply_func(Lambda, x, lambda item: tf.reshape(item, (
-            -1, tf.shape(item)[1], tf.shape(item)[2], 3, self.classes + 5)))
+        x = self.apply_func(
+            Lambda,
+            x,
+            lambda item: tf.reshape(
+                item,
+                (
+                    -1,
+                    tf.shape(item)[1],
+                    tf.shape(item)[2],
+                    3,
+                    self.classes + 5,
+                ),
+            ),
+        )
         self.model_layers.append(x)
         self.previous_layer = self.model_layers[-1]
 
@@ -384,12 +432,14 @@ class BaseModel:
         self.previous_layer = input_initial
         for section in cfg_parser.sections():
             self.create_section(section, cfg_parser)
-        if len(self.output_indices) == 0: 
+        if len(self.output_indices) == 0:
             self.output_indices.append(len(self.model_layers) - 1)
-        self.output_layers.extend([self.model_layers[i] for i in self.output_indices])
+        self.output_layers.extend(
+            [self.model_layers[i] for i in self.output_indices]
+        )
         self.training_model = Model(
-            inputs=input_initial, 
-            outputs=self.output_layers)
+            inputs=input_initial, outputs=self.output_layers
+        )
         output_0, output_1, output_2 = self.output_layers
         boxes_0 = self.apply_func(
             Lambda,
@@ -454,7 +504,9 @@ class BaseModel:
                 for layer in self.training_model.layers
                 if id(layer) not in [id(item) for item in self.output_layers]
             ]
-            self.model_layers.sort(key=lambda layer: int(layer.name.split('_')[1]))
+            self.model_layers.sort(
+                key=lambda layer: int(layer.name.split('_')[1])
+            )
             self.model_layers.extend(self.output_layers)
             for i, layer in enumerate(self.model_layers):
                 current_read = weights_data.tell()

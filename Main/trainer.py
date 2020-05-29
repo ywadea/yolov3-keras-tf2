@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import sys
+
 sys.path.append('..')
 from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
@@ -31,19 +32,20 @@ class Trainer(BaseModel):
     """
 
     def __init__(
-            self,
-            input_shape,
-            model_configuration,
-            classes_file,
-            image_width,
-            image_height,
-            train_tf_record=None,
-            valid_tf_record=None,
-            anchors=None,
-            masks=None,
-            max_boxes=100,
-            iou_threshold=0.5,
-            score_threshold=0.5):
+        self,
+        input_shape,
+        model_configuration,
+        classes_file,
+        image_width,
+        image_height,
+        train_tf_record=None,
+        valid_tf_record=None,
+        anchors=None,
+        masks=None,
+        max_boxes=100,
+        iou_threshold=0.5,
+        score_threshold=0.5,
+    ):
         """
         Initialize training.
         Args:
@@ -64,10 +66,12 @@ class Trainer(BaseModel):
             input_shape,
             model_configuration,
             len(self.class_names),
-            anchors, masks,
+            anchors,
+            masks,
             max_boxes,
             iou_threshold,
-            score_threshold)
+            score_threshold,
+        )
         self.train_tf_record = train_tf_record
         self.valid_tf_record = valid_tf_record
         self.image_folder = (
@@ -210,9 +214,7 @@ class Trainer(BaseModel):
             relative_labels, augmentations, workers or 32, coordinate_labels
         )
         augment.create_sequences(sequences)
-        return augment.augment_photos_folder(
-            batch_size or 64
-        )
+        return augment.augment_photos_folder(batch_size or 64)
 
     @timer(default_logger)
     def evaluate(
@@ -245,11 +247,18 @@ class Trainer(BaseModel):
             stats, map_score.
         """
         default_logger.info('Starting evaluation ...')
-        evaluator = Evaluator(self.input_shape, self.model_configuration,
-                              self.train_tf_record, self.valid_tf_record,
-                              self.classes_file, self.anchors, self.masks,
-                              self.max_boxes, self.iou_threshold,
-                              self.score_threshold)
+        evaluator = Evaluator(
+            self.input_shape,
+            self.model_configuration,
+            self.train_tf_record,
+            self.valid_tf_record,
+            self.classes_file,
+            self.anchors,
+            self.masks,
+            self.max_boxes,
+            self.iou_threshold,
+            self.score_threshold,
+        )
         predictions = evaluator.make_predictions(
             weights_file, merge, workers, shuffle_buffer
         )
@@ -322,7 +331,9 @@ class Trainer(BaseModel):
                         shutil.rmtree(full_file_path)
                     else:
                         os.remove(full_file_path)
-                    default_logger.info(f'Deleted old output: {full_file_path}')
+                    default_logger.info(
+                        f'Deleted old output: {full_file_path}'
+                    )
 
     def create_new_dataset(self, new_dataset_conf):
         """
@@ -441,6 +452,10 @@ class Trainer(BaseModel):
         Returns:
             history object, pandas DataFrame with statistics, mAP score.
         """
+        if '4' in self.model_configuration:
+            raise NotImplementedError(
+                f'Training with YoloV4 is currently not supported'
+            )
         min_overlaps = min_overlaps or 0.5
         if clear_outputs:
             self.clear_outputs()
@@ -475,12 +490,27 @@ class Trainer(BaseModel):
         callbacks = self.create_callbacks(checkpoint_path)
         if n_epoch_eval:
             mid_train_eval = MidTrainingEvaluator(
-                self.input_shape, self.model_configuration, self.classes_file,
-                self.image_width, self.image_height, self.train_tf_record,
-                self.valid_tf_record, self.anchors, self.masks, self.max_boxes,
-                self.iou_threshold, self.score_threshold, n_epoch_eval, merge_evaluation,
-                evaluation_workers, shuffle_buffer, min_overlaps, display_stats, plot_stats,
-                save_figs, checkpoint_path
+                self.input_shape,
+                self.model_configuration,
+                self.classes_file,
+                self.image_width,
+                self.image_height,
+                self.train_tf_record,
+                self.valid_tf_record,
+                self.anchors,
+                self.masks,
+                self.max_boxes,
+                self.iou_threshold,
+                self.score_threshold,
+                n_epoch_eval,
+                merge_evaluation,
+                evaluation_workers,
+                shuffle_buffer,
+                min_overlaps,
+                display_stats,
+                plot_stats,
+                save_figs,
+                checkpoint_path,
             )
             callbacks.append(mid_train_eval)
         history = self.training_model.fit(
@@ -563,9 +593,21 @@ class MidTrainingEvaluator(Callback, Trainer):
             save_figs: If True and display_stats, plots will be save to Output folder
             weights_file: .tf file(most recent checkpoint)
         """
-        Trainer.__init__(self, input_shape, model_configuration, classes_file,
-                         image_width, image_height, train_tf_record, valid_tf_record,
-                         anchors, masks, max_boxes, iou_threshold, score_threshold)
+        Trainer.__init__(
+            self,
+            input_shape,
+            model_configuration,
+            classes_file,
+            image_width,
+            image_height,
+            train_tf_record,
+            valid_tf_record,
+            anchors,
+            masks,
+            max_boxes,
+            iou_threshold,
+            score_threshold,
+        )
         self.n_epochs = n_epochs
         self.evaluation_args = [
             weights_file,
@@ -591,38 +633,35 @@ class MidTrainingEvaluator(Callback, Trainer):
         if not (epoch + 1) % self.n_epochs == 0:
             return
         self.evaluate(*self.evaluation_args)
-        evaluation_dir = str(Path(os.path.join(
-                '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation')).
-                             absolute().resolve())
+        evaluation_dir = str(
+            Path(
+                os.path.join(
+                    '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation'
+                )
+            )
+            .absolute()
+            .resolve()
+        )
         os.mkdir(evaluation_dir)
-        current_predictions = [str(Path(os.path.join(
-            '..', 'Output', 'Data', item)).absolute().resolve())
-                               for item in os.listdir(os.path.join('..', 'Output', 'Data'))]
-        current_figures = [str(Path(os.path.join(
-            '..', 'Output', 'Plots', item)).absolute().resolve())
-                           for item in os.listdir(os.path.join('..', 'Output', 'Plots'))]
+        current_predictions = [
+            str(
+                Path(os.path.join('..', 'Output', 'Data', item))
+                .absolute()
+                .resolve()
+            )
+            for item in os.listdir(os.path.join('..', 'Output', 'Data'))
+        ]
+        current_figures = [
+            str(
+                Path(os.path.join('..', 'Output', 'Plots', item))
+                .absolute()
+                .resolve()
+            )
+            for item in os.listdir(os.path.join('..', 'Output', 'Plots'))
+        ]
         current_files = current_predictions + current_figures
         for file_path in current_files:
             if os.path.isfile(file_path):
                 file_name = os.path.basename(file_path)
                 new_path = os.path.join(evaluation_dir, file_name)
                 shutil.move(file_path, new_path)
-
-
-if __name__ == '__main__':
-    tr = Trainer((416, 416, 3),
-                 '../Config/yolo3.cfg',
-                 '../Config/beverly_hills.txt',
-                 1344, 756)
-    dt = {'dataset_name': 'beverly_hills',
-          'test_size': 0.15,
-          'relative_labels': '../Data/bh_labels.csv'}
-    tr.train(
-        100,
-        16,
-        1e-3,
-        new_dataset_conf=dt,
-        dataset_name='beverly_hills',
-        merge_evaluation=False,
-        n_epoch_eval=10
-    )
