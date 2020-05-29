@@ -87,10 +87,7 @@ Here are the **packages** you'll need to install before starting to use the dete
 * numpy==1.18.2
 * matplotlib==3.2.1
 * imgaug==0.4.0
-<<<<<<< HEAD
-=======
 * tensorflow-addons==0.10.0
->>>>>>> v4
 * imagecorruptions==1.1.0 
 
 ### **Installation**
