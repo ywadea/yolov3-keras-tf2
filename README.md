@@ -21,7 +21,8 @@
 ## **TODO**
 
 * [ ] Transfer learning
-* [ ] YoloV4 configuration
+* [x] YoloV4 configuration(Inference only)
+* [ ] YoloV4 training
 * [ ] Live plot losses
 * [ ] Command line handler
 * [ ] YoloV3 tiny
@@ -37,7 +38,11 @@
 
 * [Description](#description)
 
+* [Updates](#updates)
+
 * [Features](#features)
+  * [(new) DarkNet models loaded directly from .cfg files](#new-darknet-models-loaded-directly-from-cfg-files)
+  * [(new) YoloV4 support(inference only)](#new-yolov4-supportinference-only)
   * [tensorflow-2.X--keras-functional-api](#tensorflow-22--keras-functional-api)
   * [cpu-gpu support](#cpu--gpu-support)
   * [Random weights and DarkNet weights support](#random-weights-and-darknet-weights-support)
@@ -82,6 +87,10 @@ Here are the **packages** you'll need to install before starting to use the dete
 * numpy==1.18.2
 * matplotlib==3.2.1
 * imgaug==0.4.0
+<<<<<<< HEAD
+=======
+* tensorflow-addons==0.10.0
+>>>>>>> v4
 * imagecorruptions==1.1.0 
 
 ### **Installation**
@@ -102,15 +111,39 @@ conda install --file requirements.txt
 <!-- DESCRIPTION -->
 ## **Description**
 
-yolov3-keras-tf2 is an implementation of [yolov3](https://pjreddie.com/darknet/yolo/) (you only look once)
-which is is a state-of-the-art, real-time object detection system that is extremely fast and accurate.
-There are many implementations that support tensorflow, only a few that support tensorflow v2 and as I did
-not find versions that suit my needs so, I decided to create this version which is very flexible and 
-customizable. It requires the Python interpreter version 3.6, 3.7, 3.7+, is not platform specific and is 
-MIT licensed which means you can use, copy, modify, distribute this software however you like.
+yolov3-keras-tf2 is an initially an implementation of [yolov3](https://pjreddie.com/darknet/yolo/) 
+(you only look once) and YoloV4 support(inference only) was added(29/05/2020) which is is a state-of-the-art, 
+real-time object detection system that is extremely fast and accurate.There are many 
+implementations that support tensorflow, only a few that support tensorflow v2 and as 
+I did not find versions that suit my needs so, I decided to create this version which 
+is very flexible and customizable. It requires the Python interpreter version 3.6, 3.7, 3.7+, 
+is not platform specific and is MIT licensed which means you can use, copy, modify, distribute 
+this software however you like.
+
+<!-- Updates -->
+
+## **Updates**
+
+### 29/05/2020
+
+- Models are loaded directly from DarkNet .cfg files
+- YoloV4 is currently supported(inference only, no training)
+- Mish activation function(YoloV4)
 
 <!-- FEATURES -->
+
 ## **Features**
+
+## **(new) DarkNet models loaded directly from .cfg files**
+This feature was introduced to replace the old hard-coded model,
+models are currently loaded directly from DarkNet .cfg files for convenience
+including YoloV4 .cfg
+
+## **(new) YoloV4 support(inference only)**
+As models currently load from .cfg files directly, YoloV4 is supported
+the configuration file needs to be supplied and the model is loaded, as
+there are technical issues encountered with the loss function, only inference
+using DarkNet weights for YoloV4 is supported.
 
 ### **tensorflow 2.2 & keras functional api**
 
@@ -188,6 +221,7 @@ There are 2 currently supported formats that the program is able to read and tra
 	</object>
 	<object>
 		<name>Traffic Lights</name>
+<<<<<<< HEAD
 		<bndbox>
 			<xmin>1220.99999952</xmin>
 			<ymin>91.999999854</ymin>
@@ -207,6 +241,27 @@ There are 2 currently supported formats that the program is able to read and tra
 	<object>
 		<name>Street Sign</name>
 		<bndbox>
+=======
+		<bndbox>
+			<xmin>1220.99999952</xmin>
+			<ymin>91.999999854</ymin>
+			<xmax>1317.999999456</xmax>
+			<ymax>249.99999985799997</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Traffic Lights</name>
+		<bndbox>
+			<xmin>701.999999232</xmin>
+			<ymin>207.00000014399998</ymin>
+			<xmax>753.999998976</xmax>
+			<ymax>275.000000184</ymax>
+		</bndbox>
+	</object>
+	<object>
+		<name>Street Sign</name>
+		<bndbox>
+>>>>>>> v4
 			<xmin>798.99999984</xmin>
 			<ymin>244.999999944</ymin>
 			<xmax>881.00000016</xmax>
@@ -358,6 +413,7 @@ copy label xml files to Data > Labels
 
     trainer = Trainer(
              input_shape=(416, 416, 3),
+             model_configuration='../Config/yolo3.cfg',
              classes_file='/path/to/classes_file.txt',
              image_width=1344,  # The original image width
              image_height=756   # The original image height
@@ -481,6 +537,7 @@ Here are the most basic steps to evaluate a trained model:
 
        evaluator = Evaluator(
                    input_shape=(416, 416, 3),
+                   model_configuration='../Config/yolo3.cfg',
                    train_tf_record='/path/to/train.tfrecord',
                    valid_tf_record='/path/to/valid.tfrecord',
                    classes_file='/path/to/classes.txt',
@@ -507,10 +564,11 @@ After evaluation, you'll find resulting plots and predictions in the Output fold
 
 Here are the most basic steps to perform detection:
 
-1. Create an evaluation instance:
+1. Create a detection instance:
 
         p = Detector(
-            (416, 416, 3),
+            input_shape=(416, 416, 3),
+            model_configuration='/path/to/DarkNet/yolo_version.cfg,
             '/path/to/classes_file.txt',
             score_threshold=0.5,
             iou_threshold=0.5,

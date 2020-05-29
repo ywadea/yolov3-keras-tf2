@@ -7,7 +7,7 @@ import sys
 
 sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.dataset_handlers import read_tfr, get_feature_map
 from Helpers.utils import (
     transform_images,
@@ -18,10 +18,11 @@ from Helpers.utils import (
 from Helpers.visual_tools import visualize_pr, visualize_evaluation_stats
 
 
-class Evaluator(V3Model):
+class Evaluator(BaseModel):
     def __init__(
         self,
         input_shape,
+        model_configuration,
         train_tf_record,
         valid_tf_record,
         classes_file,
@@ -35,6 +36,7 @@ class Evaluator(V3Model):
         Evaluate a trained model.
         Args:
             input_shape: input_shape: tuple, (n, n, c)
+            model_configuration: Path to model configuration file.
             train_tf_record: Path to training TFRecord file.
             valid_tf_record: Path to validation TFRecord file.
             classes_file: File containing class names \n delimited.
@@ -51,6 +53,7 @@ class Evaluator(V3Model):
         ]
         super().__init__(
             input_shape,
+            model_configuration,
             len(self.class_names),
             anchors,
             masks,

@@ -2,8 +2,11 @@ import numpy as np
 import cv2
 import tensorflow as tf
 import os
+import sys
+
+sys.path.append('..')
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.utils import (
     get_detection_data,
     activate_gpu,
@@ -13,12 +16,13 @@ from Helpers.utils import (
 )
 
 
-class Detector(V3Model):
+class Detector(BaseModel):
     """Tool for detection on photos/videos"""
 
     def __init__(
         self,
         input_shape,
+        model_configuration,
         classes_file,
         anchors=None,
         masks=None,
@@ -31,6 +35,7 @@ class Detector(V3Model):
 
         Args:
             input_shape: tuple, (n, n, c)
+            model_configuration: Path to DarkNet cfg file.
             classes_file: File containing class names \n delimited.
             anchors: numpy array of (w, h) pairs.
             masks: numpy array of masks.
@@ -54,6 +59,7 @@ class Detector(V3Model):
         }
         super().__init__(
             input_shape=input_shape,
+            model_configuration=model_configuration,
             classes=len(self.class_names),
             anchors=anchors,
             masks=masks,

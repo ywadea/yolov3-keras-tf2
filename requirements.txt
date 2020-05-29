@@ -8,4 +8,8 @@ tensorflow-gpu==2.2.0
 numpy==1.18.2
 matplotlib==3.2.1
 imgaug==0.4.0
+<<<<<<< HEAD
 imagecorruptions==1.1.0
+=======
+tensorflow-addons==0.10.0
+>>>>>>> v4

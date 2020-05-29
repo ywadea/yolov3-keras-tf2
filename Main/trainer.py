@@ -19,15 +19,14 @@ from Helpers.annotation_parsers import parse_voc_folder
 from Helpers.anchors import k_means, generate_anchors
 from Helpers.augmentor import DataAugment
 from Config.augmentation_options import augmentations
-from Main.models import V3Model
+from Main.models import BaseModel
 from Helpers.utils import transform_images, transform_targets
 from Helpers.annotation_parsers import adjust_non_voc_csv
 from Helpers.utils import calculate_loss, timer, default_logger, activate_gpu
-from Config.augmentation_options import preset_1
 from Main.evaluator import Evaluator
 
 
-class Trainer(V3Model):
+class Trainer(BaseModel):
     """
     Create a training instance.
     """
@@ -35,6 +34,7 @@ class Trainer(V3Model):
     def __init__(
         self,
         input_shape,
+        model_configuration,
         classes_file,
         image_width,
         image_height,
@@ -49,12 +49,8 @@ class Trainer(V3Model):
         """
         Initialize training.
         Args:
+            model_configuration: Path to DarkNet cfg file.
             input_shape: tuple, (n, n, c)
-            classes_file: File containing class names \n delimited.
-            image_width: Width of the original image.
-            image_height: Height of the original image.
-            train_tf_record: TFRecord file.
-            valid_tf_record: TFRecord file.
             anchors: numpy array of (w, h) pairs.
             masks: numpy array of masks.
             max_boxes: Maximum boxes of the TFRecords provided(if any) or
@@ -68,6 +64,7 @@ class Trainer(V3Model):
         ]
         super().__init__(
             input_shape,
+            model_configuration,
             len(self.class_names),
             anchors,
             masks,
@@ -117,10 +114,10 @@ class Trainer(V3Model):
                 index=False,
             )
             check += 1
-        if configuration.get('adjusted_frame'):
+        if configuration.get('coordinate_labels'):
             if check:
                 raise ValueError(f'Got more than one configuration')
-            labels_frame = pd.read_csv(configuration['adjusted_frame'])
+            labels_frame = pd.read_csv(configuration['coordinate_labels'])
             check += 1
         return labels_frame
 
@@ -128,6 +125,7 @@ class Trainer(V3Model):
         """
         Create new anchors according to given configuration.
         Args:
+<<<<<<< HEAD
             new_anchors_conf: A dictionary containing the following keys:
                 - anchor_no
                 and one of the following:
@@ -135,6 +133,10 @@ class Trainer(V3Model):
                     - from_xml
                     - adjusted_frame
 
+=======
+            new_anchors_conf: A dictionary with the following keys:
+            - anchor_no: number of anchors to generate
+>>>>>>> v4
         Returns:
             None
         """
@@ -160,20 +162,6 @@ class Trainer(V3Model):
     def generate_new_frame(self, new_dataset_conf):
         """
         Create new labels frame according to given configuration.
-        Args:
-            new_dataset_conf: A dictionary containing the following keys:
-                - dataset_name
-                and one of the following:
-                    - relative_labels
-                    - from_xml
-                    - adjusted_frame
-                    - coordinate_labels(optional in case of augmentation)
-                - augmentation(optional)
-                and this implies the following:
-                    - sequences
-                    - workers(optional, defaults to 32)
-                    - batch_size(optional, defaults to 64)
-                    - new_size(optional, defaults to None)
 
         Returns:
             pandas DataFrame adjusted for building the dataset containing
@@ -218,17 +206,7 @@ class Trainer(V3Model):
         """
         Augment photos in self.image_paths
         Args:
-            new_dataset_conf: A dictionary containing the following keys:
-                one of the following:
-                    - relative_labels
-                    - from_xml
-                    - adjusted_frame
-                    - coordinate_labels(optional)
-                and:
-                    - sequences
-                    - workers(optional, defaults to 32)
-                    - batch_size(optional, defaults to 64)
-                    - new_size(optional, defaults to None)
+            new_dataset_conf: New dataset configuration dict.
 
         Returns:
             pandas DataFrame with both original and augmented data.
@@ -236,9 +214,8 @@ class Trainer(V3Model):
         sequences = new_dataset_conf.get('sequences')
         relative_labels = new_dataset_conf.get('relative_labels')
         coordinate_labels = new_dataset_conf.get('coordinate_labels')
-        workers = new_dataset_conf.get('workers')
-        batch_size = new_dataset_conf.get('batch_size')
-        new_augmentation_size = new_dataset_conf.get('new_size')
+        workers = new_dataset_conf.get('aug_workers')
+        batch_size = new_dataset_conf.get('aug_batch_size')
         if not sequences:
             raise ValueError(f'"sequences" not found in new_dataset_conf')
         if not relative_labels:
@@ -247,9 +224,7 @@ class Trainer(V3Model):
             relative_labels, augmentations, workers or 32, coordinate_labels
         )
         augment.create_sequences(sequences)
-        return augment.augment_photos_folder(
-            batch_size or 64, new_augmentation_size
-        )
+        return augment.augment_photos_folder(batch_size or 64)
 
     @timer(default_logger)
     def evaluate(
@@ -284,6 +259,7 @@ class Trainer(V3Model):
         default_logger.info('Starting evaluation ...')
         evaluator = Evaluator(
             self.input_shape,
+            self.model_configuration,
             self.train_tf_record,
             self.valid_tf_record,
             self.classes_file,
@@ -365,25 +341,29 @@ class Trainer(V3Model):
                         shutil.rmtree(full_file_path)
                     else:
                         os.remove(full_file_path)
-                    default_logger.info(f'Deleted old output: {full_file_path}')
+                    default_logger.info(
+                        f'Deleted old output: {full_file_path}'
+                    )
 
     def create_new_dataset(self, new_dataset_conf):
         """
-        Build new dataset and respective TFRecord(s).
+        Create a new TFRecord dataset.
         Args:
             new_dataset_conf: A dictionary containing the following keys:
-                one of the following:
-                    - relative_labels
-                    - from_xml
-                    - adjusted_frame
-                    - coordinate_labels(optional)
-                and:
-                    - sequences
-                    - workers(optional, defaults to 32)
-                    - batch_size(optional, defaults to 64)
-                    - new_size(optional, defaults to None)
-        Returns:
-            None
+                - dataset_name(required) str representing a name for the dataset
+                - test_size(optional) ex: 0.1
+                - augmentation(optional) True or False
+                - sequences(required if augmentation is True)
+                - aug_workers(optional if augmentation is True) defaults to 32.
+                - aug_batch_size(optional if augmentation is True) defaults to 64.
+                And one of the following is required:
+                    - relative_labels: Path to csv file with the following columns:
+                    ['Image', 'Object Name', 'Object Index', 'bx', 'by', 'bw', 'bh']
+                    - coordinate_labels: Path to csv file with the following columns:
+                    ['Image Path', 'Object Name', 'Image Width', 'Image Height',
+                    'X_min', 'Y_min', 'X_max', 'Y_max', 'Relative Width', 'Relative Height',
+                    'Object ID']
+                    - from_xml: True or False to parse from XML Labels folder.
         """
         default_logger.info(f'Generating new dataset ...')
         test_size = new_dataset_conf.get('test_size')
@@ -413,11 +393,11 @@ class Trainer(V3Model):
             raise ValueError(issue)
 
     @staticmethod
-    def create_callbacks(checkpoint_name):
+    def create_callbacks(checkpoint_path):
         """
         Create a list of tf.keras.callbacks.
         Args:
-            checkpoint_name: Name under which the checkpoint is saved.
+            checkpoint_path: Full path to checkpoint.
 
         Returns:
             callbacks.
@@ -425,7 +405,7 @@ class Trainer(V3Model):
         return [
             ReduceLROnPlateau(verbose=1, patience=4),
             ModelCheckpoint(
-                os.path.join(checkpoint_name),
+                os.path.join(checkpoint_path),
                 verbose=1,
                 save_weights_only=True,
             ),
@@ -482,6 +462,10 @@ class Trainer(V3Model):
         Returns:
             history object, pandas DataFrame with statistics, mAP score.
         """
+        if '4' in self.model_configuration:
+            raise NotImplementedError(
+                f'Training with YoloV4 is currently not supported'
+            )
         min_overlaps = min_overlaps or 0.5
         if clear_outputs:
             self.clear_outputs()
@@ -510,13 +494,14 @@ class Trainer(V3Model):
             for mask in self.masks
         ]
         self.training_model.compile(optimizer=optimizer, loss=loss)
-        checkpoint_name = os.path.join(
+        checkpoint_path = os.path.join(
             '..', 'Models', f'{dataset_name or "trained"}_model.tf'
         )
-        callbacks = self.create_callbacks(checkpoint_name)
+        callbacks = self.create_callbacks(checkpoint_path)
         if n_epoch_eval:
             mid_train_eval = MidTrainingEvaluator(
                 self.input_shape,
+                self.model_configuration,
                 self.classes_file,
                 self.image_width,
                 self.image_height,
@@ -535,7 +520,7 @@ class Trainer(V3Model):
                 display_stats,
                 plot_stats,
                 save_figs,
-                checkpoint_name,
+                checkpoint_path,
             )
             callbacks.append(mid_train_eval)
         history = self.training_model.fit(
@@ -547,7 +532,7 @@ class Trainer(V3Model):
         default_logger.info('Training complete')
         if evaluate:
             evaluations = self.evaluate(
-                checkpoint_name,
+                checkpoint_path,
                 merge_evaluation,
                 evaluation_workers,
                 shuffle_buffer,
@@ -568,6 +553,7 @@ class MidTrainingEvaluator(Callback, Trainer):
     def __init__(
         self,
         input_shape,
+        model_configuration,
         classes_file,
         image_width,
         image_height,
@@ -592,6 +578,7 @@ class MidTrainingEvaluator(Callback, Trainer):
         Initialize mid-training evaluation settings.
         Args:
             input_shape: tuple, (n, n, c)
+            model_configuration: Path to DarkNet cfg file.
             classes_file: File containing class names \n delimited.
             image_width: Width of the original image.
             image_height: Height of the original image.
@@ -619,6 +606,7 @@ class MidTrainingEvaluator(Callback, Trainer):
         Trainer.__init__(
             self,
             input_shape,
+            model_configuration,
             classes_file,
             image_width,
             image_height,
@@ -647,7 +635,7 @@ class MidTrainingEvaluator(Callback, Trainer):
         Start evaluation in valid epochs.
         Args:
             epoch: int, epoch number.
-            logs: dict, Tensorboard log.
+            logs: dict, TensorBoard log.
 
         Returns:
             None
@@ -655,15 +643,32 @@ class MidTrainingEvaluator(Callback, Trainer):
         if not (epoch + 1) % self.n_epochs == 0:
             return
         self.evaluate(*self.evaluation_args)
-        evaluation_dir = str(Path(os.path.join(
-                '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation')).absolute().resolve())
+        evaluation_dir = str(
+            Path(
+                os.path.join(
+                    '..', 'Output', 'Evaluation', f'epoch-{epoch}-evaluation'
+                )
+            )
+            .absolute()
+            .resolve()
+        )
         os.mkdir(evaluation_dir)
-        current_predictions = [str(Path(os.path.join(
-            '..', 'Output', 'Data', item)).absolute().resolve())
-                               for item in os.listdir(os.path.join('..', 'Output', 'Data'))]
-        current_figures = [str(Path(os.path.join(
-            '..', 'Output', 'Plots', item)).absolute().resolve())
-                           for item in os.listdir(os.path.join('..', 'Output', 'Plots'))]
+        current_predictions = [
+            str(
+                Path(os.path.join('..', 'Output', 'Data', item))
+                .absolute()
+                .resolve()
+            )
+            for item in os.listdir(os.path.join('..', 'Output', 'Data'))
+        ]
+        current_figures = [
+            str(
+                Path(os.path.join('..', 'Output', 'Plots', item))
+                .absolute()
+                .resolve()
+            )
+            for item in os.listdir(os.path.join('..', 'Output', 'Plots'))
+        ]
         current_files = current_predictions + current_figures
         for file_path in current_files:
             if os.path.isfile(file_path):
