@@ -437,8 +437,8 @@ and
 and if `augmentation` this implies the following:
 
 - `sequences`: (required) A list of augmentation sequences check [Augmentor.md](Docs/Augmentor.md) 
-- `workers`: (optional) defaults to 32 parallel augmentations.
-- `batch_size`: (optional) this is the augmentation batch size defaults to 64 images to load at once.
+- `aug_workers`: (optional) defaults to 32 parallel augmentations.
+- `aug_batch_size`: (optional) this is the augmentation batch size defaults to 64 images to load at once.
 
       dataset_conf = {
                     'relative_labels': '/path/to/labels.csv',
