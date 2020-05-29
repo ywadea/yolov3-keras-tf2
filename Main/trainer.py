@@ -87,7 +87,7 @@ class Trainer(BaseModel):
             configuration: A dictionary containing any of the following keys:
                 - relative_labels
                 - from_xml
-                - adjusted_frame
+                - coordinate_labels
 
         Returns:
             pandas DataFrame with adjusted labels.
@@ -130,7 +130,7 @@ class Trainer(BaseModel):
                 and one of the following:
                     - relative_labels
                     - from_xml
-                    - adjusted_frame
+                    - coordinate_labels
             new_anchors_conf: A dictionary with the following keys:
             - anchor_no: number of anchors to generate
         Returns:
