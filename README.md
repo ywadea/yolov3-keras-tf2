@@ -219,7 +219,6 @@ There are 2 currently supported formats that the program is able to read and tra
 	</object>
 	<object>
 		<name>Traffic Lights</name>
-<<<<<<< HEAD
 		<bndbox>
 			<xmin>1220.99999952</xmin>
 			<ymin>91.999999854</ymin>
@@ -239,7 +238,6 @@ There are 2 currently supported formats that the program is able to read and tra
 	<object>
 		<name>Street Sign</name>
 		<bndbox>
-=======
 		<bndbox>
 			<xmin>1220.99999952</xmin>
 			<ymin>91.999999854</ymin>
@@ -259,7 +257,6 @@ There are 2 currently supported formats that the program is able to read and tra
 	<object>
 		<name>Street Sign</name>
 		<bndbox>
->>>>>>> v4
 			<xmin>798.99999984</xmin>
 			<ymin>244.999999944</ymin>
 			<xmax>881.00000016</xmax>
