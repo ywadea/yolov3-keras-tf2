@@ -108,12 +108,13 @@ conda install --file requirements.txt
 <!-- DESCRIPTION -->
 ## **Description**
 
-yolov3-keras-tf2 is an initially an implementation of [yolov3](https://pjreddie.com/darknet/yolo/) 
-(you only look once) and YoloV4 support(inference only) was added(29/05/2020) which is is a state-of-the-art, 
-real-time object detection system that is extremely fast and accurate.There are many 
-implementations that support tensorflow, only a few that support tensorflow v2 and as 
-I did not find versions that suit my needs so, I decided to create this version which 
-is very flexible and customizable. It requires the Python interpreter version 3.6, 3.7, 3.7+, 
+yolov3-keras-tf2 is initially an implementation of [yolov3](https://pjreddie.com/darknet/yolo/) 
+(you only look once)(training & inference) and YoloV4 support(inference only) was added(29/05/2020) 
+which is is a state-of-the-art, real-time object detection system that is extremely 
+fast and accurate.There are many implementations that support tensorflow, only a few that 
+support tensorflow v2 and as I did not find versions that suit my needs so, 
+I decided to create this version which is very flexible and customizable. 
+It requires the Python interpreter version 3.6, 3.7, 3.7+, 
 is not platform specific and is MIT licensed which means you can use, copy, modify, distribute 
 this software however you like.
 
