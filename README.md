@@ -142,14 +142,11 @@ including YoloV4 .cfg
 
 ## **(new) YoloV4 support**
 As models currently load from .cfg files directly, YoloV4 is supported
-<<<<<<< HEAD
 the configuration file needs to be supplied and the model is loaded, as
 there are technical issues encountered with the loss function, only inference
 using DarkNet weights for YoloV4 is currently supported.
-=======
 the configuration file needs to be supplied and the model is loaded and 
 ready for usage.
->>>>>>> v4
 
 ### **tensorflow 2.2 & keras functional api**
 
