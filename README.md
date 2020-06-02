@@ -23,6 +23,7 @@
 * [ ] Transfer learning
 * [x] YoloV4 configuration(Inference only)
 * [x] YoloV4 training
+* [ ] YoloV4 loss function adjustments.
 * [ ] Live plot losses
 * [ ] Command line handler
 * [x] YoloV3 tiny
