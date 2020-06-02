@@ -22,10 +22,10 @@
 
 * [ ] Transfer learning
 * [x] YoloV4 configuration(Inference only)
-* [ ] YoloV4 training
+* [x] YoloV4 training
 * [ ] Live plot losses
 * [ ] Command line handler
-* [ ] YoloV3 tiny
+* [x] YoloV3 tiny
 * [ ] Rasberry Pi support
 
 
@@ -42,7 +42,7 @@
 
 * [Features](#features)
   * [(new) DarkNet models loaded directly from .cfg files](#new-darknet-models-loaded-directly-from-cfg-files)
-  * [(new) YoloV4 support(inference only)](#new-yolov4-supportinference-only)
+  * [(new) YoloV4 support](#new-yolov4-supportinference-only)
   * [tensorflow-2.X--keras-functional-api](#tensorflow-22--keras-functional-api)
   * [cpu-gpu support](#cpu--gpu-support)
   * [Random weights and DarkNet weights support](#random-weights-and-darknet-weights-support)
@@ -109,7 +109,7 @@ conda install --file requirements.txt
 ## **Description**
 
 yolov3-keras-tf2 is initially an implementation of [yolov3](https://pjreddie.com/darknet/yolo/) 
-(you only look once)(training & inference) and YoloV4 support(inference only) was added(29/05/2020) 
+(you only look once)(training & inference) and YoloV4 support was added(02/06/2020) 
 which is is a state-of-the-art, real-time object detection system that is extremely 
 fast and accurate.There are many implementations that support tensorflow, only a few that 
 support tensorflow v2 and as I did not find versions that suit my needs so, 
@@ -121,6 +121,9 @@ this software however you like.
 <!-- Updates -->
 
 ## **Updates**
+
+### 02/06/2020
+- YoloV4 training is currently supported.
 
 ### 29/05/2020
 
@@ -137,11 +140,10 @@ This feature was introduced to replace the old hard-coded model,
 models are currently loaded directly from DarkNet .cfg files for convenience
 including YoloV4 .cfg
 
-## **(new) YoloV4 support(inference only)**
+## **(new) YoloV4 support**
 As models currently load from .cfg files directly, YoloV4 is supported
-the configuration file needs to be supplied and the model is loaded, as
-there are technical issues encountered with the loss function, only inference
-using DarkNet weights for YoloV4 is supported.
+the configuration file needs to be supplied and the model is loaded and 
+ready for usage.
 
 ### **tensorflow 2.2 & keras functional api**
 

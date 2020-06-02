@@ -458,10 +458,6 @@ class Trainer(BaseModel):
         Returns:
             history object, pandas DataFrame with statistics, mAP score.
         """
-        if '4' in self.model_configuration:
-            raise NotImplementedError(
-                f'Training with YoloV4 is currently not supported'
-            )
         min_overlaps = min_overlaps or 0.5
         if clear_outputs:
             self.clear_outputs()
