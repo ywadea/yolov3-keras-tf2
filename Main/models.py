@@ -437,6 +437,8 @@ class BaseModel:
         self.output_layers.extend(
             [self.model_layers[i] for i in self.output_indices]
         )
+        if '4' in self.model_configuration:
+            self.output_layers.reverse()
         self.training_model = Model(
             inputs=input_initial, outputs=self.output_layers
         )
